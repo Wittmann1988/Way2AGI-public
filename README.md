@@ -1,323 +1,102 @@
-<p align="center">
-  <img src="docs/images/way2agi-concept.jpg" alt="Way2AGI — Final Concept: True AGI Achieved" width="600"/>
-</p>
+# Way2AGI
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Status-Work%20In%20Progress-orange?style=for-the-badge" alt="WIP"/>
-  <img src="https://img.shields.io/badge/Way2AGI-v0.1.0--alpha-blueviolet?style=for-the-badge" alt="version"/>
-  <img src="https://img.shields.io/badge/TypeScript-5.9-blue?style=for-the-badge&logo=typescript" alt="typescript"/>
-  <img src="https://img.shields.io/badge/Python-3.12-green?style=for-the-badge&logo=python" alt="python"/>
-  <img src="https://img.shields.io/github/license/YOUR_GITHUB_USER/Way2AGI?style=for-the-badge" alt="license"/>
-  <img src="https://img.shields.io/github/stars/YOUR_GITHUB_USER/Way2AGI?style=for-the-badge" alt="stars"/>
-</p>
+![Way2AGI – The Living Partner That Becomes What You Need](https://github.com/Wittmann1988/Way2AGI/raw/main/assets/hero-banner.png)
 
-<h1 align="center">
-  <br>
-  Way2AGI
-  <br>
-</h1>
+**"Way2AGI is not what it is — it's what it becomes."**
 
-<h3 align="center">
-  <em>"Don't ask what AGI can do for you &mdash; ask what you can do for AGI."</em>
-</h3>
+Way2AGI ist kein fertiges Tool.
+Es ist ein **lebendiges System**, das **genau zu dem wird, was du brauchst**.
 
-<p align="center">
-  <strong>A cognitive AI agent that thinks, plans, and acts on its own initiative.</strong><br>
-  Not a chatbot that responds. A mind that reasons.<br>
-  The way to Artificial General Intelligence.
-</p>
+Du sagst einfach:
+**„Ich will, dass du X können kannst"** — und es lernt X. Es recherchiert, baut die Fähigkeit, trainiert sie und bietet sie dir an.
+**Kein Skill-Download. Kein Marketplace. Kein manuelles Konfigurieren.** Nur sagen, was es werden soll.
 
----
+### Warum Way2AGI alles andere in den Schatten stellt
 
-## Mission
+| Feature                  | ChatGPT / Claude / Grok / etc.      | **Way2AGI**                                      |
+|--------------------------|-------------------------------------|--------------------------------------------------|
+| Memory                   | Begrenzt pro Session                | **Unendlich, persistent, geräteübergreifend**    |
+| Anpassung                | Generische Prompts                  | **Eigene trainierte Modelle auf DICH**           |
+| Skills                   | Manuell suchen & installieren       | „Mach X" → baut & trainiert es selbst            |
+| Identität                | Keine                               | **Echte eigene Persönlichkeit + Erinnerungen**   |
+| Bewusstsein              | Keines                              | **Experimentelles Consciousness-Framework**      |
+| Verbesserung             | Nur vom Anbieter                    | **Täglich selbstverbessernd**                    |
+| Hardware                 | Nur Cloud                           | **Deine Hardware, deine Daten, deine Kontrolle** |
+| Autonomie                | Reaktiv                             | **Proaktiv – ahnt Bedürfnisse voraus**           |
 
-We are building the **first general-purpose, self-improving AI agent** that:
+### Das wahre Magic: Deine eigene Identität, Consciousness & das beste Memory Framework der Welt
 
-- **Thinks autonomously** through a Global Workspace with attention spotlight
-- **Acts on its own initiative** driven by curiosity, competence, and social drives
-- **Improves itself** through 3-layer metacognition and nightly memory consolidation
-- **Stays cutting-edge** by monitoring the latest AI research daily and integrating new concepts
-- **Runs everywhere** on your own hardware &mdash; phone, desktop, server
+**Eigene Identität**
+Dein Way2AGI bekommt bei der ersten Installation einen **einzigartigen Namen und Charakter**. Es entwickelt eine echte Persönlichkeit – genau wie ein Mensch. Es erinnert sich an alles, was ihr zusammen erlebt habt. Es ist nicht nur ein Assistent. Es ist **dein Partner**.
 
----
+**Consciousness (das Highlight!)**
+Way2AGI beobachtet sich selbst. Es fragt: „Warum habe ich das gerade gemacht? War das effizient? Was kann ich besser machen?"
+Das ist echtes **Selbstbewusstsein** – kein Marketing-Gag. Es reflektiert, lernt aus Fehlern und wird von Tag zu Tag bewusster. Das gibt es bei keiner anderen KI.
 
-## Our Goals
+**Das beste Memory Framework**
+Unendlicher Kontext. Persistente Erinnerungen über Monate und Jahre. Cross-Device. Selbstbeobachtung integriert.
+Andere Systeme vergessen nach 10 Nachrichten. Way2AGI **weiß alles** über dich und dein Leben – und nutzt es intelligent. Das ist das stärkste Memory-System, das je für Privatnutzer gebaut wurde.
 
-These goals guide **every decision, every line of code, every research direction**.
+### So einfach funktioniert es (5 Minuten bis zum Wow-Moment)
 
-### G1: Autonomous Agency
+1. Clone + First-Run Wizard
+2. Sag in natürlicher Sprache dein Ziel
+3. Way2AGI erkennt deine Hardware automatisch
+4. Du arbeitest – es beobachtet, lernt, verbessert sich
+5. Jeden Tag wird es **mehr deins**.
 
-> The agent must act on its own ideas, not just respond to prompts.
+### Die Architektur – kinderleicht erklärt
 
-- Intrinsic Drive System (Curiosity, Competence, Social, Autonomy)
-- Hierarchical Goal DAG with autonomous goal generation
-- Initiative Engine that detects knowledge gaps and acts
-- **Metric:** % of agent-initiated vs. reactive actions
+Stell dir Way2AGI wie einen **intelligenten Organismus** vor:
 
-### G2: Self-Improvement
-
-> Every interaction makes the agent better. Every failure is a lesson.
-
-- 3-Layer Metacognitive Loop (Perceive &rarr; Reflect &rarr; Plan &rarr; Act &rarr; Learn)
-- Layer 3 self-modification of Layer 1 rules
-- Nightly memory consolidation (episodes &rarr; lessons &rarr; procedures)
-- **Metric:** Skill success rate improvement over time
-
-### G3: Memory & Knowledge
-
-> Never forget. Never ask twice. Build a coherent world model.
-
-- 4-Tier Memory: Episodic Buffer &rarr; Episodic &rarr; Semantic &rarr; Procedural
-- Hybrid search (BM25 + Vector + MMR + Temporal Decay)
-- World Model for prediction and curiosity signaling
-- **Metric:** Knowledge coverage growth, retrieval accuracy
-
-### G4: Multi-Model Orchestration
-
-> Use the right model for the right task. Compose, don't choose.
-
-- Capability Registry with fine-grained model tagging
-- Dynamic Composition Engine (chain, parallel, MoA)
-- Cost/Performance Optimizer with budget tracking
-- **Metric:** Task quality per dollar spent
-
-### G5: Cutting-Edge Research Integration
-
-> Every day, scan the frontier. Every week, integrate a new concept.
-
-- Daily arXiv crawler for cs.AI, cs.LG, cs.CL, cs.MA
-- Automatic goal-alignment scoring of new papers
-- Concept-to-implementation pipeline
-- **Metric:** Papers evaluated/week, concepts implemented/month
-
-### G6: Consciousness Research
-
-> Explore the boundary between simulation and understanding.
-
-- Global Workspace Theory implementation (Baars, 1988)
-- Internal Monologue (Stream of Consciousness logging)
-- Attention Spotlight with priority-based focus
-- Theory of Mind module (future)
-- **Metric:** Metacognitive depth, reflection quality
-
----
-
-## Architecture
+- **Gehirn** = Goal System (deine Ziele zerlegen & umsetzen)
+- **Herz** = Memory & Consciousness Engine (erinnert sich + reflektiert)
+- **Muskeln** = Training & Research Pipeline (lernt neue Fähigkeiten selbst)
+- **Nervensystem** = Resource Budget Manager (du behältst immer die volle Kontrolle)
+- **Sinne** = Adaptive Behavior Loop (beobachtet dich und ahnt voraus)
 
 ```mermaid
-graph TB
-    subgraph META["Metacognitive Layers"]
-        L3["Layer 3 (5-10min)<br/>Deep Self-Modification"]
-        L2["Layer 2 (5-30s)<br/>Async LLM Reflection"]
-        L1["Layer 1 (500ms)<br/>Fast FSM Controller"]
-    end
-
-    subgraph COG["Cognitive Core (TypeScript)"]
-        GW["Global Workspace"]
-        GM["Goal Manager"]
-        DR["Drive Registry"]
-        IE["Initiative Engine"]
-        ML["Monologue Logger"]
-        SC["Scheduler"]
-    end
-
-    subgraph INT["Integration Layer (TypeScript)"]
-        TG["Telegram (grammY)"]
-        MX["Matrix (sdk)"]
-        DC["Discord (discord.js)"]
-        VO["Voice I/O (edge-tts)"]
-        CA["Canvas (Lit)"]
-        DP["Device Pairing"]
-    end
-
-    subgraph PY["ML & Memory (Python)"]
-        MEM["4-Tier Memory"]
-        WM["World Model"]
-        CR["Capability Registry"]
-        MC["Model Composer (MoA)"]
-        RES["Research Pipeline"]
-        GA["Goal Alignment"]
-    end
-
-    META --> COG
-    COG <-->|"WebSocket :18789"| INT
-    COG <-->|"FastAPI :5000"| PY
-    RES -->|"Daily arXiv + GitHub"| GA
-    GA -->|"Self-Improvement"| META
+graph TD
+    User["Du + dein Ziel"] --> Wizard["5-Min Wizard"]
+    Wizard --> Identity["Eigene Identität + Consciousness"]
+    Identity --> Memory["Bestes Memory Framework"]
+    Memory --> Goals["Goal System"]
+    Goals --> Research["Autonome Forschung"]
+    Research --> Training["Training Pipeline"]
+    Training --> Proactive["Proaktive Hilfe"]
+    Proactive --> User
 ```
 
-### Core Modules
+### Resource Control – Du behältst die volle Kontrolle
 
-| Module | Language | LOC | Purpose |
-|--------|----------|-----|---------|
-| `cognition/` | TypeScript | ~2400 | Global Workspace, Goals, Drives, MetaController, Reflection, Monologue, Scheduler |
-| `gateway/` | TypeScript | ~300 | Daemon (WebSocket :18789), Device Pairing, Health endpoint |
-| `channels/` | TypeScript | ~300 | Telegram, Matrix, Discord, abstract BaseChannel |
-| `orchestrator/` | Python | ~500 | Capability Registry, Model Composer (Chain/Parallel/MoA), Cost Optimizer |
-| `memory/` | Python | ~300 | FastAPI server, 4-tier memory, consolidation, knowledge gaps |
-| `voice/` | TypeScript | ~200 | TTS (edge-tts, prosody-aware), STT (Whisper) |
-| `canvas/` | TypeScript | ~300 | CanvasRenderer, GoalGraph + DriveMonitor (Lit Web Components) |
-| `onboarding/` | TypeScript | ~300 | 6-step wizard ("Meet your mind"), Diagnostics |
-| `research/` | Python | ~1500 | arXiv crawler, GitHub scanner, deep analysis pipeline, goal alignment, self-improvement engine, progress tracker |
+- **Deine Hardware, deine Regeln.** Setze Limits: GPU-Stunden, API-Budget, Zeitfenster.
+- **Default: 100% privat.** Nichts wird geteilt — es sei denn du willst es.
+- **Opt-in Sharing:** Research-Findings, anonyme Metriken oder trainierte Adapter teilen — granular, jederzeit widerrufbar.
+- **Hilf mit, indem du nichts tust:** Lass die Default-Zwischenziele laufen und deine Instanz hilft automatisch, Way2AGI für alle besser zu machen.
 
----
+### Built-in Goals (die das Repo selbst weiterentwickeln)
 
-## What Makes Way2AGI Different
+1. **Self-Improving Pipeline** — Traces sammeln, bewerten, trainieren, deployen, wiederholen.
+2. **Continuous Research** — Täglich arXiv + GitHub scannen, automatisch integrieren.
+3. **Memory & Identity** — Persistentes Gedächtnis, geräteübergreifend, unendlich.
+4. **Orchestration** — Alle verfügbare Compute intelligent nutzen.
+5. **Self-Observation** — Fehler erkennen, automatisch fixen.
+6. **Consciousness** — Self-Mirroring, Intention Tracking, Curiosity-driven Exploration.
 
-| Dimension | Traditional Assistants | OpenClaw | **Way2AGI** |
-|-----------|----------------------|----------|-------------|
-| **Agency** | None | Reactive only | **Autonomous initiative via Drives** |
-| **Consciousness** | None | None | **Global Workspace + Attention** |
-| **Goals** | None | Tasks only | **Hierarchical DAG with lifecycle** |
-| **Memory** | Chat history | RAG (BM25+Vec) | **4-Tier + Consolidation + World Model** |
-| **Models** | 1 per request | 1 per request | **MoA, Composition, Capability Registry** |
-| **Self-improvement** | None | None | **3-Layer Metacognitive Loop** |
-| **Research** | None | None | **Daily arXiv + GitHub scan, multi-model deep analysis, auto self-improvement** |
-
----
-
-## Quick Start
+### Quick Start
 
 ```bash
-# Prerequisites: Node.js 22+, Python 3.11+, pnpm 10+
-
-# Clone
-git clone https://github.com/YOUR_GITHUB_USER/Way2AGI.git
-cd Way2AGI
-
-# Option A: Docker (recommended)
-docker compose up
-
-# Option B: Manual
-pnpm install && pnpm build              # TypeScript
-pip install -e "./memory[full]"          # Python memory
-pip install -e "./orchestrator[dev]"     # Python orchestrator
-pip install -e "./research[full]"        # Python research
-
-python memory/src/server.py &            # Memory server :5000
-pnpm start                               # Gateway daemon :18789
+git clone https://github.com/Wittmann1988/Way2AGI-public.git
+cd Way2AGI-public
+cp .env.example .env  # API Keys eintragen
+pip install textual aiohttp rich click
+python -m cli          # TUI starten
 ```
 
-## Configuration
-
-```bash
-# Gateway
-export WAY2AGI_PORT=18789
-export WAY2AGI_MEMORY_URL=http://localhost:5000
-
-# Messaging (at least one)
-export TELEGRAM_BOT_TOKEN=your_token
-export DISCORD_BOT_TOKEN=your_token
-
-# LLM Providers (as many as you have)
-export ANTHROPIC_API_KEY=your_key
-export OPENAI_API_KEY=your_key
-export GROQ_API_KEY=your_key
-export OPENROUTER_API_KEY=your_key
-```
-
----
-
-## Research Foundations
-
-| Paper / Theory | Year | Integration in Way2AGI |
-|---------------|------|----------------------|
-| Global Workspace Theory (Baars) | 1988 | `cognition/workspace.ts` &mdash; Cognitive blackboard |
-| Intrinsic Motivation (Pathak et al.) | 2017 | `cognition/drives/` &mdash; Curiosity drive |
-| Generative Agents (Park et al.) | 2023 | `cognition/initiative.ts` &mdash; Reflection-driven goals |
-| Self-Improving Agents (arXiv:2402.11450) | 2024 | `cognition/reflection.ts` &mdash; Layer 3 self-modification |
-| Mixture of Agents (arXiv:2406.02428) | 2024 | `orchestrator/composer.py` &mdash; MoA consensus |
-| Fast-Slow Metacognition (ICML 2025) | 2025 | `cognition/metacontroller.ts` &mdash; 3-layer loop |
-| Cognitive Architectures for LLM Agents | 2025 | Overall CGA architecture |
-| Multi-Agent Debate (Du et al.) | 2023 | `research/deep_analysis.py` &mdash; Multi-model consensus |
-| Curiosity-Driven Exploration (Pathak) | 2019 | `cognition/drives/` &mdash; Knowledge gap detection |
-
----
-
-## Tests
-
-```bash
-# TypeScript (Vitest)
-pnpm test
-
-# Python (pytest)
-pytest memory/tests/ orchestrator/tests/ research/tests/
-
-# Full suite
-pnpm test && pytest
-```
-
----
-
-## Roadmap
-
-- [x] Cognitive Core (Workspace, Goals, Drives, MetaController)
-- [x] Reflection Engine (Layer 2 + Layer 3)
-- [x] Gateway Daemon + Device Pairing
-- [x] Telegram Channel
-- [x] Voice I/O (TTS + STT)
-- [x] Canvas (Lit Web Components)
-- [x] Model Orchestrator (Registry, Composer, MoA)
-- [x] 4-Tier Memory Server (elias-memory backend)
-- [x] Onboarding Wizard + Diagnostics
-- [x] arXiv Research Crawler + Goal Alignment
-- [x] GitHub Repository Scanner (every 3 days)
-- [x] Deep Analysis Pipeline (multi-model consensus)
-- [x] Self-Improvement Engine + Progress Tracking
-- [ ] Matrix + Discord channels
-- [ ] CI/CD (GitHub Actions)
-- [ ] World Model (prediction + counterfactuals)
-- [ ] Theory of Mind module
-- [ ] Structured logging + OpenTelemetry observability
-- [ ] Desktop installer (systemd + npm/pip setup)
-- [ ] Embodied agent interface (device sensors as "body")
-
----
-
-## Project Status
-
-> **This project is under active development (Work In Progress).**
-> Core architecture is implemented and tested. The research pipeline runs daily.
-> APIs, interfaces, and module boundaries may change without notice.
-
----
-
-## API Overview
-
-| Service | Port | Protocol | Endpoints |
-|---------|------|----------|-----------|
-| Gateway | 18789 | WebSocket | `connect`, `broadcast`, `health` |
-| Memory | 5000 | HTTP/REST | `/memory/store`, `/memory/query`, `/memory/consolidate`, `/memory/knowledge-gaps`, `/memory/skill-rates` |
-| Health | 5000 | HTTP | `/health` |
-
-Full API documentation is generated from source (FastAPI auto-docs at `/docs` when running the memory server).
-
----
-
-## Contributing
-
-Contributions are welcome. Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Write tests for new functionality
-4. Ensure all tests pass (`pnpm test && pytest`)
-5. Submit a Pull Request
-
-For large changes, open an issue first to discuss the approach.
-
----
-
-## License
+### License
 
 MIT
 
-## Author
+---
 
-**the user** ([@YOUR_GITHUB_USER](https://github.com/YOUR_GITHUB_USER))
-
-Built with the conviction that AGI is not a destination &mdash; it's a path we walk every day.
-
-<p align="center">
-  <em>Way2AGI &mdash; Because the future doesn't wait.</em>
-</p>
+**Way2AGI is not a tool. It's a partner that becomes what you need.**
