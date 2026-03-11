@@ -70,6 +70,13 @@ except ImportError:
     def get_prompt(role: str, extra_context: str = "") -> str:  # type: ignore[misc]
         return f"Du bist ein Agent im Way2AGI System. Rolle: {role}"
 
+try:
+    from core.central_orchestrator import CentralOrchestrator
+    _has_central_orch = True
+except ImportError:
+    CentralOrchestrator = None  # type: ignore[assignment,misc]
+    _has_central_orch = False
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -123,6 +130,7 @@ active_tasks: dict[str, dict[str, Any]] = {}
 ws_clients: list[WebSocket] = []
 cost_tracker: dict[str, float] = {"total_usd": 0.0, "session_usd": 0.0}
 _startup_time: float = 0.0
+_central_orch: CentralOrchestrator | None = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -612,6 +620,29 @@ async def lifespan(app: FastAPI):
                                  "status": "down", "latency_ms": -1,
                                  "backends": {}, "models_loaded": []}
 
+    # Initialize CentralOrchestrator (bid-based routing via MicroOrchestrators)
+    global _central_orch
+    if _has_central_orch:
+        _central_orch = CentralOrchestrator()
+        # Register devices with their MicroOrchestrator ports
+        # MicroOrchestrator runs on port+1 (e.g. controller:8050 -> MicroOrch:8051)
+        for name, cfg in NODES.items():
+            micro_port = int(os.environ.get(
+                f"{name.upper()}_MICRO_PORT",
+                {"controller": 8051, "desktop": 8101, "laptop": 8151, "mobile": 8201}.get(name, 0)
+            ))
+            if micro_port:
+                _central_orch.register_device(name, cfg["ip"], micro_port)
+        # Check which MicroOrchestrators are alive
+        orch_health = await _central_orch.check_all_devices()
+        for name, status in orch_health.items():
+            log.info("  MicroOrch %s: %s", name, status)
+        log.info("CentralOrchestrator: %d/%d MicroOrchestratoren aktiv",
+                 _central_orch.get_status()["active"],
+                 _central_orch.get_status()["total"])
+    else:
+        log.warning("CentralOrchestrator nicht verfuegbar — Fallback auf model_map")
+
     # Memory DB check
     if Path(DB_PATH).exists():
         stats = db_memory_stats()
@@ -712,6 +743,52 @@ async def orchestrate(req: OrchestrateRequest):
     t0 = time.time()
     traces: list[dict[str, Any]] = []
 
+    # Use CentralOrchestrator (bid-based) if available, else fallback to model_map
+    if _central_orch and _central_orch.get_status()["active"] > 0:
+        # --- Bid-based orchestration via MicroOrchestrators ---
+        try:
+            result = await _central_orch.orchestrate(req.task, strategy=req.strategy)
+            duration = round(time.time() - t0, 2)
+            routing = result.get("routing", {})
+            response_text = result.get("result", "")
+            traces = result.get("traces", [])
+            traces.insert(0, {"step": "method", "result": "central_orchestrator_bids"})
+
+            save_action_log(
+                "orchestrate", "server",
+                model_used=routing.get("model", ""),
+                device=routing.get("device", ""),
+                input_summary=req.task[:200],
+                output_summary=str(response_text)[:300],
+            )
+            save_trace(
+                "orchestrate", req.task[:2000], str(response_text)[:2000],
+                int(duration * 1000), True, routing.get("model", ""),
+            )
+
+            await broadcast_ws({
+                "type": "orchestrate_complete",
+                "task_preview": req.task[:80],
+                "node": routing.get("device", ""),
+                "model": routing.get("model", ""),
+                "method": "bid",
+                "duration_s": duration,
+                "timestamp": datetime.now().isoformat(),
+            })
+
+            return OrchestrateResponse(
+                result=response_text,
+                routing=routing,
+                duration_s=duration,
+                traces=traces,
+            )
+        except Exception as e:
+            log.warning("CentralOrchestrator fehlgeschlagen, Fallback: %s", e)
+            traces.append({"step": "central_orch_error", "error": str(e)})
+
+    # --- Fallback: hardcoded model_map routing ---
+    traces.append({"step": "method", "result": "model_map_fallback"})
+
     # 1. Classify task
     task_type = classify_task(req.task)
     traces.append({"step": "classify", "result": task_type})
@@ -756,7 +833,6 @@ async def orchestrate(req: OrchestrateRequest):
         int(duration * 1000), True, model_used,
     )
 
-    # Broadcast to WS
     await broadcast_ws({
         "type": "orchestrate_complete",
         "task_preview": req.task[:80],
@@ -1040,6 +1116,22 @@ async def stop_discussion():
     })
 
     return result
+
+
+@app.get("/v1/orchestrator/status")
+async def orchestrator_status():
+    """Status of the bid-based CentralOrchestrator and its MicroOrchestrators."""
+    if not _central_orch:
+        return {"method": "model_map_fallback", "central_orchestrator": None}
+
+    status = _central_orch.get_status()
+    # Also get capabilities from active MicroOrchestrators
+    caps = await _central_orch.discover_all_capabilities()
+    return {
+        "method": "central_orchestrator_bids",
+        "status": status,
+        "capabilities": caps,
+    }
 
 
 @app.websocket("/ws")
