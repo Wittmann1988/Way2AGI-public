@@ -48,6 +48,8 @@ except ImportError:
 COST_PER_M_INPUT = {
     "claude": 3.0,
     "gpt4": 2.5,
+    "gpt5": 5.0,
+    "xai": 3.0,
     "gemini": 0.0,
     "groq": 0.0,
 }
@@ -55,6 +57,8 @@ COST_PER_M_INPUT = {
 COST_PER_M_OUTPUT = {
     "claude": 15.0,
     "gpt4": 10.0,
+    "gpt5": 15.0,
+    "xai": 15.0,
     "gemini": 0.0,
     "groq": 0.0,
 }
@@ -64,9 +68,11 @@ COST_PER_M_OUTPUT = {
 # ---------------------------------------------------------------------------
 
 TASK_PRIORITY = {
-    "coding": ["gpt4", "claude", "groq", "gemini"],
-    "reasoning": ["claude", "gpt4", "groq", "gemini"],
+    "coding": ["gpt5", "gpt4", "claude", "groq", "gemini"],
+    "reasoning": ["xai", "gpt5", "claude", "groq", "gemini"],
+    "creative": ["claude", "gpt5", "xai", "gemini", "groq"],
     "quick": ["groq", "gemini", "gpt4", "claude"],
+    "architecture": ["gpt5", "xai", "claude", "gemini"],
     "default": ["groq", "gemini", "gpt4", "claude"],  # cheapest first
 }
 
@@ -123,16 +129,24 @@ class CloudProviderManager:
                 except Exception as exc:
                     logger.warning("Claude init failed: %s", exc)
 
-        # --- OpenAI / GPT-4 ---
+        # --- OpenAI / GPT-4 + GPT-5 ---
         if _HAS_OPENAI:
             key = os.environ.get("OPENAI_API_KEY")
             if key:
                 try:
                     client = openai.OpenAI(api_key=key)
                     self._clients["gpt4"] = client
-                    logger.info("GPT-4 provider initialised.")
+                    self._clients["gpt5"] = client  # Same client, different model
+                    logger.info("GPT-4/5 provider initialised.")
                 except Exception as exc:
-                    logger.warning("GPT-4 init failed: %s", exc)
+                    logger.warning("GPT-4/5 init failed: %s", exc)
+
+        # --- xAI / Grok ---
+        xai_key = os.environ.get("XAI_API_KEY")
+        if xai_key:
+            # xAI uses curl (Cloudflare blocks urllib), no SDK needed
+            self._clients["xai"] = True  # Marker — actual calls use subprocess
+            logger.info("xAI/Grok provider initialised (curl-based).")
 
         # --- Google / Gemini ---
         if _HAS_GOOGLE:
@@ -246,6 +260,58 @@ class CloudProviderManager:
         c_tok = resp.usage.completion_tokens if resp.usage else 0
         return text, p_tok, c_tok
 
+    def _call_gpt5(
+        self, prompt: str, system: Optional[str], max_tokens: int
+    ) -> tuple[str, int, int]:
+        """GPT-5.4 — uses max_completion_tokens instead of max_tokens."""
+        client = self._clients["gpt5"]
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        resp = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=messages,
+            max_completion_tokens=max_tokens,
+        )
+        text = resp.choices[0].message.content or ""
+        p_tok = resp.usage.prompt_tokens if resp.usage else 0
+        c_tok = resp.usage.completion_tokens if resp.usage else 0
+        return text, p_tok, c_tok
+
+    def _call_xai(
+        self, prompt: str, system: Optional[str], max_tokens: int
+    ) -> tuple[str, int, int]:
+        """Grok-4.20 via xAI API — uses subprocess curl (urllib gets 403 from Cloudflare)."""
+        import json
+        import subprocess
+        key = os.environ.get("XAI_API_KEY", "")
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        payload = json.dumps({
+            "model": "grok-4.20-beta-0309-reasoning",
+            "messages": messages,
+            "max_tokens": max_tokens,
+        })
+        result = subprocess.run(
+            ["curl", "-s", "-X", "POST",
+             "https://api.x.ai/v1/chat/completions",
+             "-H", f"Authorization: Bearer {key}",
+             "-H", "Content-Type: application/json",
+             "-d", payload],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"xAI curl failed: {result.stderr}")
+        data = json.loads(result.stdout)
+        if "error" in data:
+            raise RuntimeError(f"xAI API error: {data['error']}")
+        text = data["choices"][0]["message"]["content"]
+        usage = data.get("usage", {})
+        return text, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0)
+
     def _call_gemini(
         self, prompt: str, system: Optional[str], max_tokens: int
     ) -> tuple[str, int, int]:
@@ -285,6 +351,8 @@ class CloudProviderManager:
     _DISPATCH = {
         "claude": _call_claude,
         "gpt4": _call_gpt4,
+        "gpt5": _call_gpt5,
+        "xai": _call_xai,
         "gemini": _call_gemini,
         "groq": _call_groq,
     }

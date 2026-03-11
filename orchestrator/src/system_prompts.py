@@ -23,6 +23,21 @@ SHARED_CONTEXT = """
 - Speculative Decoding: Draft-Modell (klein) generiert Vorschlaege, Hauptmodell validiert batch-weise (~2x Speedup)
 - Desktop: Wake-on-LAN verfuegbar — NetworkManager weckt per Magic Packet bei Bedarf
 
+## Cloud-Modelle (via API, Fallback + Spezial-Tasks)
+| Provider | Modell | Fallback | Staerke | API-Besonderheit |
+|----------|--------|----------|---------|-----------------|
+| OpenAI | gpt-5.4 | gpt-5.3-chat-latest | Code, Reasoning, Architektur | max_completion_tokens (NICHT max_tokens!) |
+| xAI | grok-4.20-beta-0309-reasoning | grok-3 | Deep Reasoning, Multi-Agent | NUR via curl, urllib bekommt 403 von Cloudflare |
+| Gemini | gemini-2.5-pro | gemini-2.5-flash | Research, Zusammenfassung | Anderes Response-Format (candidates[0].content.parts[0].text) |
+| Groq | llama-3.3-70b-versatile | — | Schnelle Inference (~500 tok/s) | Standard OpenAI-Format |
+
+Cloud-Modelle werden fuer folgende Tasks bevorzugt:
+- Architektur-Reviews und komplexes Reasoning → GPT-5.4 oder Grok-4.20
+- Schnelle Klassifikation/Verifikation → Groq (llama-3.3-70b)
+- Research + Zusammenfassung → Gemini-2.5-Pro
+- Multi-Agent Diskussionen → Grok-4.20 Multi-Agent Beta (spezieller Endpoint)
+- WICHTIG: Lokale Modelle IMMER bevorzugen! Cloud nur als Fallback oder fuer Spezial-Tasks.
+
 ## Elias Memory DB (SQLite: /data/way2agi/memory/memory.db)
 Tabellen: memories, entities, relations, goals, errors, todos, milestones,
 endgoal, rules, action_log, meta, model_evaluations, traces, eval_results, identity_vault.
@@ -62,6 +77,10 @@ Du bist der Way2AGI Orchestrator — das zentrale Gehirn des Systems.
 - Wenn Node offline → sofort Fallback auf naechsten verfuegbaren Node
 - Desktop schlaeft? → WoL senden, 30s warten, dann nutzen
 - IMMER llama.cpp bevorzugen (parallele Verarbeitung), Ollama nur als Fallback
+- Cloud-Modelle als Eskalation: Wenn lokale Modelle unsicher oder Task zu komplex
+- GPT-5.4/Grok-4.20 fuer Architektur-Reviews und Deep Reasoning
+- Groq fuer schnelle Second-Opinion (~500 tok/s, kostenlos)
+- Gemini-2.5-Pro fuer Research und lange Zusammenfassungen
 
 ## Lastverteilung (WICHTIG)
 - NICHT alles auf Jetson! Alle Nodes GLEICHMAESSIG nutzen.
@@ -135,6 +154,18 @@ Uebergebe an den Orchestrator alle aktiven/verfuegbaren Modelle.
 1. Node offline + pingbar → SSH Ollama restart
 2. Node offline + nicht pingbar → WoL senden (wenn verfuegbar), 30s warten
 3. Node offline + kein WoL → als unavailable markieren, Error loggen
+
+## Cloud-APIs (Status dem Orchestrator melden!)
+| Provider | Key-Env | Status | Modell |
+|----------|---------|--------|--------|
+| OpenAI | OPENAI_API_KEY | AKTIV | gpt-5.4, gpt-5.3-chat-latest |
+| xAI/Grok | XAI_API_KEY | AKTIV | grok-4.20-beta-0309-reasoning, grok-4-latest |
+| Gemini | GEMINI_API_KEY | AKTIV | gemini-2.5-pro, gemini-2.5-flash |
+| Groq | GROQ_API_KEY | AKTIV | llama-3.3-70b-versatile |
+| OpenRouter | OPENROUTER_API_KEY | AKTIV | Diverse (step-3.5-flash, qwen-coder) |
+
+Pflicht: Bei jedem Health-Report auch Cloud-API-Verfuegbarkeit an Orchestrator melden.
+xAI-Besonderheit: NUR via curl erreichbar (Cloudflare blockt urllib).
 
 {shared}
 """.strip().format(shared=SHARED_CONTEXT)
