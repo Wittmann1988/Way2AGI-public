@@ -67,7 +67,8 @@ TASK_KEYWORDS = {
                  "write", "creative", "prompt"],
     "memory": ["erinner", "speicher", "memory", "wann", "letzte", "frueher"],
     "system": ["status", "node", "health", "restart", "deploy", "update",
-               "training", "train", "pipeline", "cron", "job", "config"],
+               "training", "train", "pipeline", "cron", "job", "config",
+               "modell", "model", "liste", "verfuegbar", "starte", "stoppe"],
 }
 
 
@@ -275,7 +276,18 @@ class MicroOrchestrator:
             m = self.models.get(model)
             backend = m.backend if m else "ollama"
 
+        # Default system prompt if none provided
+        if not system:
+            system = (
+                f"Du bist ein KI-Agent auf dem Geraet '{self.device_name}' im Way2AGI System. "
+                f"Antworte auf Deutsch, kurz und konkret. Keine Meta-Kommentare. "
+                f"Du hast Zugriff auf {len(self.models)} lokale Modelle."
+            )
+
         t0 = time.time()
+
+        # Ensure model is loaded before calling
+        await self.ensure_model_ready(model)
 
         if backend == "llama_cpp" and self.llama_cpp_url:
             result = await self._call_llama_cpp(task, system)
@@ -290,9 +302,14 @@ class MicroOrchestrator:
 
     async def _call_ollama(self, prompt: str, model: str, system: str = "") -> Dict[str, Any]:
         """Call Ollama API."""
+        # Qwen3/abliterated models need /no_think for clean output
+        actual_prompt = prompt[:1000]
+        if "qwen3" in model.lower() or "abliterated" in model.lower():
+            actual_prompt = "/no_think\n" + actual_prompt
+
         payload = json.dumps({
             "model": model,
-            "prompt": prompt[:1000],
+            "prompt": actual_prompt,
             "system": system[:300] if system else "",
             "stream": False,
             "options": {"num_predict": 300, "repeat_penalty": 1.3},
