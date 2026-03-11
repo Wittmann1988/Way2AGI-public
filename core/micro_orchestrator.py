@@ -346,6 +346,84 @@ class MicroOrchestrator:
         except Exception as e:
             return {"error": str(e), "success": False}
 
+    # --- Model Lifecycle Management (T035) ---
+
+    async def load_model(self, model_name: str) -> Dict[str, Any]:
+        """Start/load a model via Ollama. Orchestrator decides WHICH models run."""
+        try:
+            # Ollama loads a model by sending a generate with num_predict=0
+            payload = json.dumps({
+                "model": model_name,
+                "prompt": "",
+                "options": {"num_predict": 0},
+            }).encode()
+            req = urllib.request.Request(
+                self.ollama_url + "/api/generate",
+                data=payload, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=60)
+            log.info("Modell geladen: %s", model_name)
+            # Re-discover to update model list
+            await self.discover_models()
+            return {"loaded": model_name, "success": True}
+        except Exception as e:
+            log.warning("Modell laden fehlgeschlagen: %s — %s", model_name, e)
+            return {"loaded": model_name, "success": False, "error": str(e)}
+
+    async def unload_model(self, model_name: str) -> Dict[str, Any]:
+        """Unload a model to free VRAM. Uses Ollama keep_alive=0."""
+        try:
+            payload = json.dumps({
+                "model": model_name,
+                "keep_alive": 0,
+            }).encode()
+            req = urllib.request.Request(
+                self.ollama_url + "/api/generate",
+                data=payload, method="POST",
+                headers={"Content-Type": "application/json"},
+            )
+            urllib.request.urlopen(req, timeout=10)
+            log.info("Modell entladen: %s", model_name)
+            return {"unloaded": model_name, "success": True}
+        except Exception as e:
+            return {"unloaded": model_name, "success": False, "error": str(e)}
+
+    async def ensure_model_ready(self, model_name: str) -> bool:
+        """Ensure a model is loaded and ready. Load it if not running."""
+        # Check if model is in running models
+        try:
+            req = urllib.request.Request(
+                self.ollama_url + "/api/ps", method="GET"
+            )
+            resp = urllib.request.urlopen(req, timeout=5)
+            data = json.loads(resp.read())
+            running = [m.get("name", "") for m in data.get("models", [])]
+            if model_name in running:
+                return True
+        except Exception:
+            pass
+
+        # Not running — load it
+        result = await self.load_model(model_name)
+        return result.get("success", False)
+
+    def get_available_models(self) -> List[str]:
+        """Get all models installed (not just running) on this device."""
+        return list(self.models.keys())
+
+    def get_running_models(self) -> List[str]:
+        """Get currently loaded/running models."""
+        try:
+            req = urllib.request.Request(
+                self.ollama_url + "/api/ps", method="GET"
+            )
+            resp = urllib.request.urlopen(req, timeout=5)
+            data = json.loads(resp.read())
+            return [m.get("name", "") for m in data.get("models", [])]
+        except Exception:
+            return []
+
     # --- Capabilities Report ---
 
     def get_capabilities(self) -> Dict[str, Any]:
