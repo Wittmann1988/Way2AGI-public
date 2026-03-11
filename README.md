@@ -1,6 +1,6 @@
 # Way2AGI
 
-![Way2AGI – The Living Partner That Becomes What You Need](https://github.com/Wittmann1988/Way2AGI/raw/main/assets/hero-banner.png)
+![Way2AGI – The Living Partner That Becomes What You Need](https://github.com/Wittmann1988/Way2AGI-public/raw/main/assets/hero-banner.jpg)
 
 **"Way2AGI is not what it is — it's what it becomes."**
 
