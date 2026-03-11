@@ -111,6 +111,25 @@ class MicroOrchestrator:
         self.models: Dict[str, LocalModel] = {}
         self.last_discovery = 0.0
         self._started_at = time.time()
+        # VRAM-Budget: Auto-Detect oder Fallback
+        self._total_vram_gb = self._detect_vram_gb()
+
+    def _detect_vram_gb(self) -> float:
+        """Erkennt verfuegbares VRAM (GPU) oder RAM (CPU-only)."""
+        # Jetson: Shared Memory = gesamter RAM
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal"):
+                        kb = int(line.split()[1])
+                        total = round(kb / 1024 / 1024, 1)
+                        # Jetson 64GB: ~58GB nutzbar, Desktop RTX5090: 32GB VRAM
+                        log.info("VRAM/RAM erkannt: %.1fGB (%s)", total, self.device_name)
+                        return total
+        except Exception:
+            pass
+        # Fallback
+        return 32.0
 
     # --- Model Discovery ---
 
@@ -426,23 +445,80 @@ class MicroOrchestrator:
             return {"unloaded": model_name, "success": False, "error": str(e)}
 
     async def ensure_model_ready(self, model_name: str) -> bool:
-        """Ensure a model is loaded and ready. Load it if not running."""
-        # Check if model is in running models
-        try:
-            req = urllib.request.Request(
-                self.ollama_url + "/api/ps", method="GET"
-            )
-            resp = urllib.request.urlopen(req, timeout=5)
-            data = json.loads(resp.read())
-            running = [m.get("name", "") for m in data.get("models", [])]
-            if model_name in running:
-                return True
-        except Exception:
-            pass
+        """Ensure a model is loaded and ready. Manages VRAM automatically."""
+        running_models = self._get_running_models_detail()
+        running_names = [m["name"] for m in running_models]
 
-        # Not running — load it
+        if model_name in running_names:
+            return True
+
+        # VRAM-Check: Genug Platz fuer das neue Modell?
+        model_info = self.models.get(model_name)
+        needed_gb = model_info.size_gb if model_info else 4.0
+        used_gb = sum(m.get("size_gb", 0) for m in running_models)
+        free_gb = self._total_vram_gb - used_gb
+
+        if needed_gb > free_gb:
+            # VRAM voll — entlade LRU-Modelle (nicht-trainierte zuerst)
+            log.info("VRAM knapp: brauche %.1fGB, frei %.1fGB — entlade Modelle",
+                     needed_gb, free_gb)
+            freed = await self._free_vram(needed_gb - free_gb, running_models, model_name)
+            if not freed:
+                log.warning("Konnte nicht genug VRAM freigeben fuer %s", model_name)
+
         result = await self.load_model(model_name)
         return result.get("success", False)
+
+    def _get_running_models_detail(self) -> List[Dict[str, Any]]:
+        """Holt laufende Modelle mit VRAM-Verbrauch von Ollama."""
+        try:
+            req = urllib.request.Request(self.ollama_url + "/api/ps", method="GET")
+            resp = urllib.request.urlopen(req, timeout=5)
+            data = json.loads(resp.read())
+            result = []
+            for m in data.get("models", []):
+                name = m.get("name", "")
+                size_bytes = m.get("size", 0)
+                size_gb = round(size_bytes / 1e9, 1) if size_bytes else 0
+                # Fallback: Groesse aus unserer Registry
+                if not size_gb and name in self.models:
+                    size_gb = self.models[name].size_gb
+                result.append({
+                    "name": name,
+                    "size_gb": size_gb,
+                    "is_trained": "way2agi" in name.lower(),
+                    "expires_at": m.get("expires_at", ""),
+                })
+            return result
+        except Exception:
+            return []
+
+    async def _free_vram(self, needed_gb: float, running: List[Dict],
+                         keep_model: str = "") -> bool:
+        """Entlaedt Modelle bis genug VRAM frei ist. Priorisierung:
+        1. Nicht-trainierte kleine Modelle zuerst entladen
+        2. Nicht-trainierte grosse Modelle
+        3. Trainierte Modelle nur im Notfall
+        Nie das aktuell benoetigte Modell entladen."""
+        # Sortierung: trainierte Modelle am Ende (schuetzen), grosse zuerst (mehr VRAM frei)
+        candidates = sorted(
+            [m for m in running if m["name"] != keep_model],
+            key=lambda m: (m["is_trained"], -m["size_gb"]),
+        )
+
+        freed = 0.0
+        for model in candidates:
+            if freed >= needed_gb:
+                break
+            log.info("Entlade %s (%.1fGB) um Platz zu schaffen", model["name"], model["size_gb"])
+            result = await self.unload_model(model["name"])
+            if result.get("success"):
+                freed += model["size_gb"]
+                # Kurz warten damit Ollama VRAM freigibt
+                await asyncio.sleep(1)
+
+        log.info("VRAM freigemacht: %.1fGB (benoetigt: %.1fGB)", freed, needed_gb)
+        return freed >= needed_gb
 
     def get_available_models(self) -> List[str]:
         """Get all models installed (not just running) on this device."""
@@ -484,12 +560,29 @@ class MicroOrchestrator:
             "timestamp": datetime.now().isoformat(),
         }
 
+    def get_vram_status(self) -> Dict[str, Any]:
+        """VRAM-Auslastung in Prozent."""
+        running = self._get_running_models_detail()
+        used_gb = sum(m["size_gb"] for m in running)
+        total = self._total_vram_gb
+        pct = round(used_gb / total * 100, 1) if total > 0 else 0
+        return {
+            "device": self.device_name,
+            "total_gb": total,
+            "used_gb": round(used_gb, 1),
+            "free_gb": round(total - used_gb, 1),
+            "utilization_pct": pct,
+            "models_loaded": [{"name": m["name"], "size_gb": m["size_gb"]} for m in running],
+        }
+
     def get_health(self) -> Dict[str, Any]:
         """Quick health check."""
+        vram = self.get_vram_status()
         return {
             "status": "ok" if self.models else "no_models",
             "device": self.device_name,
             "models": len(self.models),
+            "vram_pct": vram["utilization_pct"],
             "uptime_s": round(time.time() - self._started_at, 1),
         }
 
@@ -548,5 +641,9 @@ def create_app(orch: MicroOrchestrator):
     async def discover():
         models = await orch.discover_models()
         return {"models": len(models), "device": orch.device_name}
+
+    @app.get("/vram")
+    async def vram():
+        return orch.get_vram_status()
 
     return app
