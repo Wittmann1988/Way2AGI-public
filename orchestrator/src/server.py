@@ -304,21 +304,20 @@ def call_model_simple(
     """
     # Model -> node mapping
     model_map: dict[str, tuple[str, str]] = {
-        "nemotron": ("jetson", "nemotron-3-nano:30b"),
-        "lfm2": ("jetson", "lfm2:24b"),
-        "qwen3-abl": ("jetson", "huihui_ai/qwen3-abliterated:8b"),
+        "nemotron": ("controller", "nemotron-3-nano:30b"),
+        "lfm2": ("controller", "lfm2:24b"),
+        "qwen3-abl": ("controller", "huihui_ai/qwen3-abliterated:8b"),
         "qwen3.5": ("desktop", "qwen3.5:9b"),
-        "qwen3.5-mini": ("jetson", "qwen3.5:0.8b"),
-        "qwen3.5-mini-mobile": ("s24", "qwen3.5:0.8b"),
+        "qwen3.5-mini": ("controller", "qwen3.5:0.8b"),
         "deepseek-r1": ("desktop", "deepseek-r1:7b"),
-        "smallthinker": ("zenbook", "smallthinker:1.8b"),
-        "qwen3-lite": ("s24", "qwen3:1.7b"),
+        "smallthinker": ("laptop", "mannix/smallthinker-abliterated:latest"),
+        "qwen3-lite": ("laptop", "qwen3:1.7b"),
     }
 
     # Resolve "auto" — pick the best available node
     if model == "auto" or model == "cloud":
         # Priority: jetson nemotron > desktop qwen3.5 > zenbook smallthinker > mini fallbacks
-        preferred = ["nemotron", "lfm2", "qwen3.5", "smallthinker", "qwen3.5-mini", "qwen3-lite", "qwen3.5-mini-mobile"]
+        preferred = ["nemotron", "lfm2", "qwen3.5", "smallthinker", "qwen3.5-mini", "qwen3-lite"]
     else:
         # Check if it's a known alias
         preferred = [model] if model in model_map else ["nemotron", "lfm2"]
@@ -412,17 +411,17 @@ def route_task(task_type: str) -> tuple[str, str]:
     """Pick node + model based on task type. Returns (node_name, model_alias)."""
     routing = {
         "code": ("desktop", "qwen3.5"),
-        "reasoning": ("jetson", "nemotron"),
-        "creative": ("jetson", "lfm2"),
-        "memory": ("jetson", "nemotron"),
-        "system": ("jetson", "qwen3.5-mini"),
+        "reasoning": ("controller", "nemotron"),
+        "creative": ("controller", "lfm2"),
+        "memory": ("controller", "nemotron"),
+        "system": ("controller", "qwen3.5-mini"),
     }
     node, model = routing.get(task_type, ("jetson", "nemotron"))
     # Fallback if preferred node is down
     ns = node_status.get(node, {})
     if ns.get("status") == "down":
         # Try jetson first, then any available
-        for fallback in ["jetson", "desktop", "zenbook", "s24"]:
+        for fallback in ["controller", "desktop", "laptop", "mobile"]:
             if fallback != node and node_status.get(fallback, {}).get("status") != "down":
                 log.info("Routing-Fallback: %s -> %s", node, fallback)
                 return fallback, model
