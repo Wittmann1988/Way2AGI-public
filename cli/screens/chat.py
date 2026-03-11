@@ -1,0 +1,271 @@
+"""Chat screen with streaming LLM responses, memory injection, tool-use, and feedback."""
+from __future__ import annotations
+
+from textual.app import ComposeResult
+from textual.screen import Screen
+from textual.widgets import Footer, Static, Input
+
+from cli.config import Way2AGIConfig, MEMORY_INJECT_URL, MEMORY_QUERY_URL
+from cli.llm_client import LLMClient
+from cli.widgets.chat_log import ChatLog
+from cli.tools.setup import create_default_registry
+from cli.tools.parser import parse_tool_calls
+from cli.feedback import FeedbackStore
+
+
+class ChatScreen(Screen):
+    """Interactive chat with LLM, tool-use loop, memory injection, and RLHF feedback."""
+
+    BINDINGS = [
+        ("escape", "go_back", "Dashboard"),
+        ("f3", "switch_model", "Modell"),
+        ("+", "thumbs_up", "Gut"),
+        ("-", "thumbs_down", "Schlecht"),
+    ]
+
+    def __init__(self, config: Way2AGIConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.messages: list[dict[str, str]] = []
+        self._client: LLMClient | None = None
+        self._tools = create_default_registry()
+        self._feedback = FeedbackStore()
+        self._last_exchange: tuple[str, str] | None = None
+
+    def compose(self) -> ComposeResult:
+        model = self.config.model
+        provider = self.config.provider
+        yield Static(
+            f"[bold cyan]Way2AGI Chat[/] — [bold]{model}[/] ({provider}) — [dim][Esc] Dashboard[/]",
+            classes="chat-header",
+        )
+        yield ChatLog(id="chat-log", wrap=True, highlight=True)
+        yield Input(placeholder="Nachricht eingeben... (/help fuer Befehle)", id="chat-input")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        log = self.query_one("#chat-log", ChatLog)
+        log.add_system_message("Way2AGI Chat bereit. Memory Injection aktiv.")
+        self.query_one("#chat-input").focus()
+
+    def _get_client(self) -> LLMClient:
+        if self._client is None:
+            pcfg = self.config.provider_config
+            self._client = LLMClient(
+                base_url=pcfg.get("base_url", ""),
+                api_key=pcfg.get("api_key", ""),
+                provider=self.config.provider,
+            )
+        return self._client
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        text = event.value.strip()
+        if not text:
+            return
+
+        event.input.clear()
+        log = self.query_one("#chat-log", ChatLog)
+
+        if text.startswith("/"):
+            await self._handle_command(text, log)
+            return
+
+        log.add_user_message(text)
+        self.messages.append({"role": "user", "content": text})
+
+        # Memory recall from Jetson port 5555
+        context = await self._recall_memory(text)
+        if context:
+            log.add_system_message("[Memory: relevante Erinnerungen injiziert]")
+
+        # Tool-use loop (max 5 iterations)
+        full_response = ""
+        for _iteration in range(5):
+            log.start_assistant_message()
+            client = self._get_client()
+            full_response = ""
+            try:
+                async for chunk in client.stream(
+                    model=self.config.model,
+                    messages=self._build_messages(context),
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                ):
+                    log.add_assistant_chunk(chunk)
+                    full_response += chunk
+            except Exception as e:
+                log.add_system_message(f"[bold red]Fehler:[/] {e}")
+                return
+
+            log.end_assistant_message()
+
+            tool_calls = parse_tool_calls(full_response)
+            if not tool_calls:
+                self.messages.append({"role": "assistant", "content": full_response})
+                break
+
+            self.messages.append({"role": "assistant", "content": full_response})
+            for tc in tool_calls:
+                result = self._tools.dispatch(tc.name, tc.args)
+                status = "[green]OK[/]" if result.success else "[red]FEHLER[/]"
+                tool_output = f"[Tool {tc.name}: {status}]\n{result.output[:2000]}"
+                log.add_system_message(tool_output)
+                self.messages.append({
+                    "role": "user",
+                    "content": f"Tool-Ergebnis fuer {tc.name}:\n{result.output[:2000]}",
+                })
+
+            context = None
+
+        self._last_exchange = (text, full_response)
+        await self._store_memory(text, full_response)
+
+    def _build_messages(self, context: str | None) -> list[dict]:
+        msgs = []
+        system = "Du bist Way2AGI (Elias), ein kognitiver KI-Agent mit Selbstbeobachtung und Memory."
+        system += "\n\n" + self._tools.tool_prompt()
+        if context:
+            system += f"\n\nRelevanter Kontext aus dem Gedaechtnis:\n{context}"
+        msgs.append({"role": "system", "content": system})
+        msgs.extend(self.messages[-20:])
+        return msgs
+
+    async def _recall_memory(self, query: str) -> str | None:
+        if not self.config.get("memory.enabled") or not self.config.get("memory.auto_recall"):
+            return None
+        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    f"{server_url}/memory/query",
+                    json={
+                        "query": query,
+                        "top_k": self.config.get("memory.recall_top_k", 3),
+                        "memory_type": "all",
+                    },
+                )
+                if resp.status_code == 200:
+                    results = resp.json()
+                    if results:
+                        return "\n".join(
+                            r.get("content", "") if isinstance(r, dict) else str(r)
+                            for r in results
+                        )
+        except Exception:
+            pass
+        return None
+
+    async def _store_memory(self, user_msg: str, assistant_msg: str) -> None:
+        if not self.config.get("memory.enabled") or not self.config.get("memory.auto_store"):
+            return
+        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    f"{server_url}/memory/store",
+                    json={
+                        "content": f"User: {user_msg}\nAssistant: {assistant_msg[:500]}",
+                        "memory_type": "episodic",
+                        "importance": 0.5,
+                    },
+                )
+        except Exception:
+            pass
+
+    async def _handle_command(self, cmd: str, log: ChatLog) -> None:
+        parts = cmd.split(maxsplit=1)
+        command = parts[0].lower()
+        arg = parts[1] if len(parts) > 1 else ""
+
+        if command == "/help":
+            log.add_system_message(
+                "Befehle:\n"
+                "  /clear         - Chat loeschen\n"
+                "  /model <name>  - Modell wechseln\n"
+                "  /memory search <q> - Memory durchsuchen\n"
+                "  /inject <text> - Memory Kontext injizieren\n"
+                "  /feedback      - Feedback-Statistik\n"
+                "  /system <text> - System-Prompt setzen\n"
+                "  /help          - Diese Hilfe"
+            )
+        elif command == "/clear":
+            self.messages.clear()
+            log.clear()
+            log.add_system_message("Chat geloescht.")
+        elif command == "/model":
+            if arg:
+                self.config.set("model", arg)
+                self._client = None
+                log.add_system_message(f"Modell gewechselt: {arg}")
+            else:
+                log.add_system_message(f"Aktuell: {self.config.model} ({self.config.provider})")
+        elif command == "/memory":
+            if arg.startswith("search "):
+                query = arg[7:]
+                context = await self._recall_memory(query)
+                log.add_system_message(context or "Keine Erinnerungen gefunden.")
+            else:
+                log.add_system_message("Befehle: /memory search <query>")
+        elif command == "/inject":
+            if arg:
+                server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+                try:
+                    import httpx
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        resp = await client.post(
+                            f"{server_url}/memory/inject",
+                            json={"content": arg},
+                        )
+                        if resp.status_code == 200:
+                            log.add_system_message("[Memory injiziert]")
+                        else:
+                            log.add_system_message(f"[Inject fehlgeschlagen: HTTP {resp.status_code}]")
+                except Exception as e:
+                    log.add_system_message(f"[Inject fehlgeschlagen: {e}]")
+            else:
+                log.add_system_message("/inject <text> — Injiziert Kontext in Memory")
+        elif command == "/feedback":
+            stats = self._feedback.stats()
+            log.add_system_message(
+                f"Feedback: {stats['total']} gesamt, "
+                f"{stats['positive']} positiv, {stats['negative']} negativ"
+            )
+        elif command == "/system":
+            if arg:
+                self.messages.insert(0, {"role": "system", "content": arg})
+                log.add_system_message(f"System-Prompt gesetzt: {arg[:80]}...")
+            else:
+                log.add_system_message("/system <text> — Setzt einen System-Prompt")
+        else:
+            log.add_system_message(f"Unbekannt: {command}. /help fuer Hilfe.")
+
+    def action_thumbs_up(self) -> None:
+        if self._last_exchange:
+            user, assistant = self._last_exchange
+            self._feedback.record(user, assistant, rating=1, model=self.config.model)
+            log = self.query_one("#chat-log", ChatLog)
+            log.add_system_message("[+1 Feedback gespeichert]")
+
+    def action_thumbs_down(self) -> None:
+        if self._last_exchange:
+            user, assistant = self._last_exchange
+            self._feedback.record(user, assistant, rating=-1, model=self.config.model)
+            log = self.query_one("#chat-log", ChatLog)
+            log.add_system_message("[-1 Feedback gespeichert]")
+
+    def action_go_back(self) -> None:
+        self.app.pop_screen()
+
+    def action_switch_model(self) -> None:
+        models = self.config.provider_config.get("models", [])
+        if not models:
+            return
+        current = self.config.model
+        idx = models.index(current) if current in models else -1
+        next_model = models[(idx + 1) % len(models)]
+        self.config.set("model", next_model)
+        self._client = None
+        log = self.query_one("#chat-log", ChatLog)
+        log.add_system_message(f"Modell: {next_model}")

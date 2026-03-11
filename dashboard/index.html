@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Way2AGI Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="header">
+    <div class="header-left">
+      <h1>Way2AGI</h1>
+      <span class="header-badge">Orchestrator</span>
+    </div>
+    <div class="header-right">
+      <span class="status-dot" id="connection-dot"></span>
+      <span id="connection-status">Verbinde...</span>
+      <span class="separator">|</span>
+      <span id="total-cost">$0.000</span>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <main id="app">
+    <!-- Left: Chat -->
+    <section id="chat-panel">
+      <div id="chat-messages"></div>
+      <form id="chat-form">
+        <div class="input-row">
+          <select id="task-type">
+            <option value="">Auto-Route</option>
+            <option value="coding">Coding</option>
+            <option value="reasoning">Reasoning</option>
+            <option value="quick">Quick</option>
+            <option value="analysis">Analysis</option>
+            <option value="security">Security</option>
+            <option value="german">Deutsch</option>
+          </select>
+          <textarea id="chat-input" placeholder="Nachricht an Elias..." rows="1"></textarea>
+          <button type="submit" id="send-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+            </svg>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Right: Dashboard -->
+    <section id="dashboard-panel">
+      <!-- Node Cards -->
+      <div id="node-cards"></div>
+
+      <!-- Utilization Chart -->
+      <div class="chart-container">
+        <h3>Node-Auslastung (Live)</h3>
+        <canvas id="utilization-chart"></canvas>
+      </div>
+
+      <!-- Recent Tasks -->
+      <div id="recent-tasks">
+        <h3>Letzte Tasks</h3>
+        <div id="task-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

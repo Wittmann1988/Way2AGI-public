@@ -1,0 +1,305 @@
+/* Way2AGI Cyberpunk Theme */
+
+Screen {
+    background: #0a0a1a;
+    color: #e0e0ff;
+}
+
+.way2agi-header {
+    padding: 1 2;
+    color: #00ffff;
+    text-align: center;
+    background: #0a0a1a;
+}
+
+#dashboard-grid {
+    layout: grid;
+    grid-size: 2 2;
+    grid-gutter: 1;
+    padding: 1 2;
+    height: 1fr;
+}
+
+.panel {
+    border: solid #ff00ff;
+    padding: 1 2;
+    background: #0d0d22;
+}
+
+.panel-title {
+    color: #00ffff;
+    text-style: bold;
+    padding: 0 0 1 0;
+}
+
+.status-panel {
+    width: 1fr;
+    padding: 1 2;
+    border: solid #00ffff;
+    background: #0d0d22;
+}
+
+.actions-panel {
+    width: 1fr;
+    padding: 1 2;
+    border: solid #ff00ff;
+    background: #0d0d22;
+}
+
+.screen-title {
+    dock: top;
+    padding: 1 2;
+    background: #1a0033;
+    color: #00ffff;
+    text-align: center;
+    text-style: bold;
+}
+
+.chat-header {
+    dock: top;
+    padding: 0 2;
+    background: #1a0033;
+    color: #00ffff;
+}
+
+#chat-log {
+    height: 1fr;
+    padding: 0 1;
+    background: #0a0a1a;
+}
+
+#chat-input {
+    dock: bottom;
+    border: solid #ff00ff;
+    background: #0d0d22;
+}
+
+.node-online {
+    color: #00ff00;
+    text-style: bold;
+}
+
+.node-offline {
+    color: #ff4444;
+    text-style: bold;
+}
+
+.node-panel {
+    border: solid #333366;
+    padding: 1;
+    margin: 0 1;
+    background: #0d0d22;
+    height: auto;
+}
+
+.vram-bar {
+    color: #ff00ff;
+}
+
+#settings-form {
+    padding: 1 2;
+    height: auto;
+}
+
+#settings-form Label {
+    margin: 1 0 0 0;
+    color: #00ffff;
+}
+
+#settings-form Input {
+    border: solid #333366;
+    background: #0d0d22;
+}
+
+#settings-form Select {
+    border: solid #333366;
+    background: #0d0d22;
+}
+
+#settings-form Button {
+    margin: 1 1 0 0;
+}
+
+Button {
+    background: #1a0033;
+    color: #00ffff;
+    border: solid #ff00ff;
+}
+
+Button:hover {
+    background: #2a0055;
+}
+
+Button.-primary {
+    background: #001a33;
+    border: solid #00ffff;
+}
+
+Footer {
+    background: #0d0d22;
+    color: #888;
+}
+
+DataTable {
+    background: #0a0a1a;
+    height: 1fr;
+}
+
+DataTable > .datatable--header {
+    background: #1a0033;
+    color: #00ffff;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: #1a0044;
+}
+
+RichLog {
+    background: #0a0a1a;
+    height: 1fr;
+    padding: 0 1;
+}
+
+Input {
+    border: solid #333366;
+    background: #0d0d22;
+}
+
+Input:focus {
+    border: solid #00ffff;
+}
+
+Select {
+    border: solid #333366;
+    background: #0d0d22;
+}
+
+#memory-search {
+    dock: top;
+    margin: 1 2;
+    border: solid #ff00ff;
+}
+
+#memory-stats {
+    dock: bottom;
+    padding: 0 2;
+    color: #888;
+}
+
+.model-group {
+    padding: 1 2;
+    border: solid #333366;
+    margin: 0 0 1 0;
+    background: #0d0d22;
+    height: auto;
+}
+
+.model-group-title {
+    color: #ff00ff;
+    text-style: bold;
+}
+
+.recommended {
+    border: solid #00ffff;
+}
+
+#model-list {
+    height: 1fr;
+    padding: 1 2;
+}
+
+.mcp-card {
+    border: solid #333366;
+    padding: 1;
+    margin: 0 0 1 0;
+    background: #0d0d22;
+    height: auto;
+}
+
+.mcp-active {
+    border: solid #00ff00;
+}
+
+#orchestrator-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-gutter: 1;
+    padding: 1 2;
+    height: 1fr;
+}
+
+.orch-panel {
+    border: solid #333366;
+    padding: 1;
+    background: #0d0d22;
+}
+
+#sysmon-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-gutter: 1;
+    padding: 1 2;
+    height: 1fr;
+}
+
+.sysmon-panel {
+    border: solid #333366;
+    padding: 1;
+    background: #0d0d22;
+}
+
+.cyan {
+    color: #00ffff;
+}
+
+.magenta {
+    color: #ff00ff;
+}
+
+.green {
+    color: #00ff00;
+}
+
+.red {
+    color: #ff4444;
+}
+
+.dim {
+    color: #666688;
+}
+
+Tabs {
+    dock: top;
+    background: #0d0d22;
+}
+
+Tab {
+    color: #888;
+    background: #0d0d22;
+}
+
+Tab.-active {
+    color: #00ffff;
+    background: #1a0033;
+    text-style: bold;
+}
+
+ContentSwitcher {
+    height: 1fr;
+}
+
+#slider-container {
+    height: auto;
+    padding: 1 2;
+}
+
+.slider-label {
+    color: #00ffff;
+    margin: 1 0 0 0;
+}
+
+.slider-value {
+    color: #ff00ff;
+    text-style: bold;
+}

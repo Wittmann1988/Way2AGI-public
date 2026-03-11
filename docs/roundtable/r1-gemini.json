@@ -1,0 +1,30 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Also gut, the user. Setzen wir uns hin. Ich bin direkt, wie gewünscht.\n\nDas Konzept ist hochambitioniert, um es milde auszudrücken, und die \"Nachtschicht\" als Zeitrahmen dafür ist schlichtweg unrealistisch für die meisten der Punkte, wie sie formuliert sind. Du hast eine beeindruckende Menge an Code und Ideen,"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "MAX_TOKENS",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1695,
+    "candidatesTokenCount": 78,
+    "totalTokenCount": 3691,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1695
+      }
+    ],
+    "thoughtsTokenCount": 1918
+  },
+  "modelVersion": "gemini-2.5-flash",
+  "responseId": "9SKvacTlDMCDxN8P1_mywAs"
+}

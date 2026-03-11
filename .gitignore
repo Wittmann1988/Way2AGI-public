@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+*.egg-info/
+.DS_Store
+*.db
+*.sqlite
+coverage/
+.turbo/
+
+# Training artifacts (too large for git)
+*.gguf
+merged_model/
+way2agi-sft/
+llama.cpp/
