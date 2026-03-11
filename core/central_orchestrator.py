@@ -249,7 +249,7 @@ class CentralOrchestrator:
                 url, data=payload, method="POST",
                 headers={"Content-Type": "application/json"},
             )
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = urllib.request.urlopen(req, timeout=300)
             return json.loads(resp.read())
         except Exception as e:
             return {"error": str(e), "success": False}
