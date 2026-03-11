@@ -19,7 +19,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -926,6 +926,117 @@ async def run_roundtable(req: RoundtableRequest):
         "rounds": result.get("total_rounds"),
         "timestamp": datetime.now().isoformat(),
     })
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Persistent Multi-Agent Discussion (T005d — Grok-Style)
+# ---------------------------------------------------------------------------
+try:
+    from core.multi_agent_loop import (
+        discussion as _discussion,
+        AgentConfig, AgentRole, get_default_jetson_agents,
+    )
+    _has_discussion = True
+except ImportError:
+    _discussion = None  # type: ignore[assignment]
+    _has_discussion = False
+
+
+class DiscussionStartRequest(BaseModel):
+    topic: str
+    agents: Optional[List[dict]] = None  # If None, use defaults
+    round_pause_s: float = 10.0
+
+
+class DiscussionInjectRequest(BaseModel):
+    message: str
+
+
+@app.post("/v1/discussion/start")
+async def start_discussion(req: DiscussionStartRequest):
+    """Start a persistent multi-agent discussion (Grok-style 4-agent loop)."""
+    if not _has_discussion:
+        raise HTTPException(501, "Multi-Agent Discussion module not available")
+
+    # Configure agents
+    if req.agents:
+        agents = [
+            AgentConfig(
+                role=AgentRole(a.get("role", "reasoner")),
+                model=a.get("model", "nemotron-3-nano:30b"),
+                node=a.get("node", "jetson"),
+            )
+            for a in req.agents
+        ]
+    else:
+        agents = get_default_jetson_agents()
+
+    _discussion._round_pause = req.round_pause_s
+    _discussion.configure_agents(agents)
+
+    # Add WebSocket listener
+    async def ws_listener(msg):
+        await broadcast_ws({"type": "discussion_message", **msg})
+    _discussion.add_listener(ws_listener)
+
+    await _discussion.start(req.topic)
+
+    await broadcast_ws({
+        "type": "discussion_started",
+        "topic": req.topic[:60],
+        "agents": [a.role.value for a in agents],
+        "timestamp": datetime.now().isoformat(),
+    })
+
+    return {
+        "status": "running",
+        "topic": req.topic,
+        "agents": [{"role": a.role.value, "model": a.model} for a in agents],
+    }
+
+
+@app.post("/v1/discussion/inject")
+async def inject_discussion(req: DiscussionInjectRequest):
+    """Inject a user message into the running discussion."""
+    if not _has_discussion or not _discussion.state.is_running:
+        raise HTTPException(400, "No active discussion")
+    await _discussion.inject_user_message(req.message)
+    return {"status": "injected", "message": req.message[:100]}
+
+
+@app.get("/v1/discussion/summary")
+async def discussion_summary():
+    """Get compressed view of current discussion."""
+    if not _has_discussion:
+        raise HTTPException(501, "Multi-Agent Discussion module not available")
+    return _discussion.get_summary()
+
+
+@app.get("/v1/discussion/log")
+async def discussion_log():
+    """Get full discussion log."""
+    if not _has_discussion:
+        raise HTTPException(501, "Multi-Agent Discussion module not available")
+    return {"messages": _discussion.get_full_log(), "count": len(_discussion.state.messages)}
+
+
+@app.post("/v1/discussion/stop")
+async def stop_discussion():
+    """Stop the persistent discussion and get final results."""
+    if not _has_discussion or not _discussion.state.is_running:
+        raise HTTPException(400, "No active discussion")
+
+    result = await _discussion.stop()
+    await _discussion.save_to_memory()
+
+    await broadcast_ws({
+        "type": "discussion_stopped",
+        "topic": result.get("topic", ""),
+        "rounds": result.get("total_rounds"),
+        "timestamp": datetime.now().isoformat(),
+    })
+
     return result
 
 
