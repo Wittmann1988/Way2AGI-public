@@ -308,6 +308,8 @@ def call_model_simple(
         "lfm2": ("jetson", "lfm2:24b"),
         "qwen3-abl": ("jetson", "huihui_ai/qwen3-abliterated:8b"),
         "qwen3.5": ("desktop", "qwen3.5:9b"),
+        "qwen3.5-mini": ("jetson", "qwen3.5:0.8b"),
+        "qwen3.5-mini-mobile": ("s24", "qwen3.5:0.8b"),
         "deepseek-r1": ("desktop", "deepseek-r1:7b"),
         "smallthinker": ("zenbook", "smallthinker:1.8b"),
         "qwen3-lite": ("s24", "qwen3:1.7b"),
@@ -315,8 +317,8 @@ def call_model_simple(
 
     # Resolve "auto" — pick the best available node
     if model == "auto" or model == "cloud":
-        # Priority: jetson nemotron > desktop qwen3.5 > zenbook smallthinker
-        preferred = ["nemotron", "lfm2", "qwen3.5", "smallthinker", "qwen3-lite"]
+        # Priority: jetson nemotron > desktop qwen3.5 > zenbook smallthinker > mini fallbacks
+        preferred = ["nemotron", "lfm2", "qwen3.5", "smallthinker", "qwen3.5-mini", "qwen3-lite", "qwen3.5-mini-mobile"]
     else:
         # Check if it's a known alias
         preferred = [model] if model in model_map else ["nemotron", "lfm2"]
@@ -375,7 +377,8 @@ TASK_CATEGORIES = {
     "creative": ["schreib", "text", "story", "gedicht", "zusammenfass", "formulier",
                  "write", "creative", "prompt"],
     "memory": ["erinner", "speicher", "memory", "wann", "letzte", "frueher", "history"],
-    "system": ["status", "node", "health", "restart", "deploy", "update", "config"],
+    "system": ["status", "node", "health", "restart", "deploy", "update", "config",
+              "training", "train", "pipeline", "cron", "job"],
 }
 
 
@@ -412,7 +415,7 @@ def route_task(task_type: str) -> tuple[str, str]:
         "reasoning": ("jetson", "nemotron"),
         "creative": ("jetson", "lfm2"),
         "memory": ("jetson", "nemotron"),
-        "system": ("zenbook", "smallthinker"),
+        "system": ("jetson", "qwen3.5-mini"),
     }
     node, model = routing.get(task_type, ("jetson", "nemotron"))
     # Fallback if preferred node is down

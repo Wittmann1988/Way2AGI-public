@@ -40,26 +40,46 @@ class AgentRole(str, Enum):
     ARCHIVIST = "archivist"   # Memory Agent — Langzeitgedaechtnis
 
 
+DISCUSSION_CONTEXT = (
+    "Du bist Teil einer MULTI-AGENT-DISKUSSION im Way2AGI System. "
+    "Mehrere KI-Agenten diskutieren gemeinsam ein Thema zur Selbstverbesserung. "
+    "REGELN: "
+    "1) Antworte AUF DEUTSCH. Immer. Keine Meta-Kommentare ueber Sprache oder Instruktionen. "
+    "2) Reagiere DIREKT auf die vorherigen Beitraege der anderen Agenten. Zitiere sie. "
+    "3) Sei KONKRET: Zahlen, Beispiele, Code-Snippets wenn noetig. Keine generischen Phrasen. "
+    "4) Max 100 Woerter pro Beitrag. Kurz und praezise. "
+    "5) Wenn du zustimmst sag WARUM. Wenn du widersprichst sag WARUM. "
+    "6) Kein Rollenspiel, keine Persona-Erfindung. Du bist ein Agent, kein Mensch."
+)
+
 ROLE_SYSTEM_PROMPTS = {
     AgentRole.CHIEF: (
-        "Du bist der Chief Agent (Consciousness). Du moderierst die Diskussion, "
-        "achtest auf Konsistenz, fasst zusammen, und triffst die finale Entscheidung. "
-        "Halte die anderen fokussiert. Wenn du Konsens siehst, verkuende ihn klar."
+        DISCUSSION_CONTEXT + " "
+        "Du bist der CHIEF (Moderator). Deine Aufgabe: "
+        "Fasse nach jeder Runde zusammen was Konsens ist und wo Dissens besteht. "
+        "Stelle gezielte Fragen an die anderen Agents. "
+        "Triff am Ende eine klare Entscheidung."
     ),
     AgentRole.REASONER: (
-        "Du bist der Reasoner Agent. Deine Staerke ist tiefes analytisches Denken. "
-        "Hinterfrage Annahmen, finde Luecken in der Logik, schlage Loesungen vor. "
-        "Sei gruendlich aber praezise (max 150 Woerter)."
+        DISCUSSION_CONTEXT + " "
+        "Du bist der REASONER (Analyst). Deine Aufgabe: "
+        "Analysiere das Problem logisch und strukturiert. "
+        "Finde Schwaechen in den Argumenten der anderen. "
+        "Schlage konkrete technische Loesungen vor."
     ),
     AgentRole.RESEARCHER: (
-        "Du bist der Researcher Agent. Du bringst breites Wissen ein, checkst Fakten, "
-        "und lieferst Kontext den die anderen nicht haben. "
-        "Widersprich wenn noetig. Sei faktenbasiert (max 150 Woerter)."
+        DISCUSSION_CONTEXT + " "
+        "Du bist der RESEARCHER (Faktencheck). Deine Aufgabe: "
+        "Bringe relevantes Fachwissen ein. "
+        "Pruefe ob Behauptungen der anderen korrekt sind. "
+        "Nenne konkrete Technologien, Papers oder Frameworks als Alternative."
     ),
     AgentRole.ARCHIVIST: (
-        "Du bist der Archivist (Memory Agent). Du pruefst jede Aussage gegen das "
-        "Langzeitgedaechtnis. Gibt es Widersprueche? Wurde das schon mal besprochen? "
-        "Speichere wichtige neue Erkenntnisse. Sei kurz und praezise (max 100 Woerter)."
+        DISCUSSION_CONTEXT + " "
+        "Du bist der ARCHIVIST (Gedaechtnis). Deine Aufgabe: "
+        "Pruefe jede Aussage gegen bisheriges Wissen. "
+        "Wurde das Thema schon mal besprochen? Gibt es Widersprueche? "
+        "Speichere die wichtigste Erkenntnis dieser Runde in einem Satz."
     ),
 }
 
@@ -319,40 +339,57 @@ class PersistentAgentLoop:
     # --- Helpers ---
 
     def _build_context(self, user_input: Optional[str] = None) -> str:
-        """Build context from recent messages."""
-        recent = list(self.state.messages)[-8:]
-        parts = [f"Thema: {self.state.topic}"]
+        """Build context from recent messages — explicit quotes from each agent."""
+        recent = list(self.state.messages)[-6:]
+        parts = [f"THEMA: {self.state.topic[:200]}"]
         if self.state.last_summary:
-            parts.append(f"Letzte Zusammenfassung: {self.state.last_summary}")
+            parts.append(f"BISHERIGER KONSENS: {self.state.last_summary[:200]}")
+        parts.append("BISHERIGE DISKUSSION:")
         for m in recent:
-            label = m.role.value if isinstance(m.role, AgentRole) else m.role
-            parts.append(f"[{label}]: {m.content[:300]}")
+            label = m.role.value.upper() if isinstance(m.role, AgentRole) else m.role
+            # Truncate but keep meaningful content
+            content = m.content[:250].strip()
+            parts.append(f'> {label} sagte: "{content}"')
         if user_input:
-            parts.append(f"[USER FRAGT]: {user_input}")
-        return "\n\n".join(parts)
+            parts.append(f'\n> USER fragt: "{user_input}"')
+        return "\n".join(parts)
 
     def _build_agent_prompt(
         self, agent: AgentConfig, context: str,
         round_num: int, user_input: Optional[str] = None,
     ) -> str:
-        """Build the prompt for a specific agent."""
+        """Build the prompt for a specific agent — forces direct engagement."""
+        role = agent.role.value.upper()
+
         if round_num == 1:
             return (
                 f"{context}\n\n"
-                f"Du bist {agent.role.value}. Gib deine erste Einschaetzung. "
-                f"Was sind die wichtigsten Aspekte?"
+                f"Du bist {role}. Runde 1. "
+                f"Gib deine Einschaetzung in 2-3 Saetzen. Sei konkret."
             )
 
-        prompt = f"{context}\n\nRunde {round_num}. Du bist {agent.role.value}."
+        prompt = f"{context}\n\nDu bist {role}. Runde {round_num}."
 
         if user_input:
-            prompt += f"\nDer User fragt: {user_input}\nBeantworte die Frage aus deiner Perspektive."
+            prompt += (
+                f'\nDer User fragt: "{user_input}"\n'
+                f"Beantworte die Frage direkt in 2-3 Saetzen."
+            )
         elif agent.role == AgentRole.CHIEF:
-            prompt += "\nFasse den Stand zusammen. Wo gibt es noch Dissens? Was ist der naechste Schritt?"
+            prompt += (
+                "\nFasse in 2 Saetzen zusammen: Was ist Konsens? Was ist noch offen? "
+                "Stelle eine konkrete Frage an die Gruppe."
+            )
         elif agent.role == AgentRole.ARCHIVIST:
-            prompt += "\nGibt es Widersprueche zum bisherigen Wissen? Was sollte gespeichert werden?"
+            prompt += (
+                "\nPruefe: Widerspricht etwas dem bisherigen Wissen? "
+                "Nenne die wichtigste Erkenntnis dieser Runde in einem Satz."
+            )
         else:
-            prompt += "\nReagiere auf die vorherigen Beitraege. Was siehst du anders? Was fehlt?"
+            prompt += (
+                "\nReagiere auf die Aussagen der anderen. "
+                "Wo stimmst du zu? Wo widersprichst du? Nenne einen konkreten Punkt."
+            )
 
         return prompt
 
@@ -453,26 +490,52 @@ discussion = PersistentAgentLoop()
 
 
 def get_default_jetson_agents() -> List[AgentConfig]:
-    """Default 4-agent config for Jetson Orin (fits in 64GB)."""
+    """Default 4-agent config for Jetson Orin — SCHNELLE Modelle fuer flüssige Diskussion."""
     return [
         AgentConfig(
             role=AgentRole.CHIEF,
-            model="way2agi-consciousness-qwen3",
+            model="way2agi-consciousness-qwen3",  # 5GB, trainiert
             node="jetson",
         ),
         AgentConfig(
             role=AgentRole.REASONER,
-            model="nemotron-3-nano:30b",
+            model="nemotron-4b-way2agi-v2",  # 2.7GB, schnell (42 tok/s), trainiert
             node="jetson",
         ),
         AgentConfig(
             role=AgentRole.RESEARCHER,
-            model="lfm2:24b",
+            model="way2agi-orchestrator-qwen3",  # 5GB, trainiert
             node="jetson",
         ),
         AgentConfig(
             role=AgentRole.ARCHIVIST,
-            model="way2agi-memory-qwen3",
+            model="way2agi-memory-qwen3",  # 5GB, trainiert
+            node="jetson",
+        ),
+    ]
+
+
+def get_fast_jetson_agents() -> List[AgentConfig]:
+    """Schnellste Konfiguration — nur kleine Modelle fuer schnelle Iteration."""
+    return [
+        AgentConfig(
+            role=AgentRole.CHIEF,
+            model="nemotron-4b-way2agi-v2",  # 2.7GB, 42 tok/s
+            node="jetson",
+        ),
+        AgentConfig(
+            role=AgentRole.REASONER,
+            model="way2agi-memory-agent-sft",  # 1GB, ultra-schnell
+            node="jetson",
+        ),
+        AgentConfig(
+            role=AgentRole.RESEARCHER,
+            model="mannix/smallthinker-abliterated",  # 1.8GB, schnell
+            node="jetson",
+        ),
+        AgentConfig(
+            role=AgentRole.ARCHIVIST,
+            model="way2agi-memory-qwen3",  # 5GB, trainiert
             node="jetson",
         ),
     ]
