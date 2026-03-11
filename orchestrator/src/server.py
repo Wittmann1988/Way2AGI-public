@@ -19,9 +19,9 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -888,6 +888,45 @@ async def memory_search(q: str = Query(..., min_length=1)):
     except Exception as e:
         log.warning("Memory-Suche fehlgeschlagen: %s", e)
         return {"query": q, "results": [], "count": 0, "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Roundtable — Multi-Model Discussion
+# ---------------------------------------------------------------------------
+try:
+    from .roundtable import roundtable as _roundtable_runner
+    _has_roundtable = True
+except ImportError:
+    _roundtable_runner = None  # type: ignore[assignment]
+    _has_roundtable = False
+
+
+class RoundtableRequest(BaseModel):
+    topic: str
+    members: List[str]
+    max_rounds: int = 6
+    include_memory: bool = True
+
+
+@app.post("/v1/roundtable")
+async def run_roundtable(req: RoundtableRequest):
+    """Start a multi-model roundtable discussion."""
+    if not _has_roundtable:
+        raise HTTPException(501, "Roundtable module not available")
+    result = await _roundtable_runner.run_roundtable(
+        topic=req.topic,
+        members=req.members,
+        max_rounds=req.max_rounds,
+        include_memory=req.include_memory,
+    )
+    # Broadcast to WebSocket
+    await broadcast_ws({
+        "type": "roundtable_complete",
+        "topic": req.topic[:60],
+        "rounds": result.get("total_rounds"),
+        "timestamp": datetime.now().isoformat(),
+    })
+    return result
 
 
 @app.websocket("/ws")
