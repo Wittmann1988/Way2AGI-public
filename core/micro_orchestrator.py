@@ -301,30 +301,39 @@ class MicroOrchestrator:
         return result
 
     async def _call_ollama(self, prompt: str, model: str, system: str = "") -> Dict[str, Any]:
-        """Call Ollama API."""
-        # Qwen3/abliterated models need /no_think for clean output
-        actual_prompt = prompt[:1000]
-        if "qwen3" in model.lower() or "abliterated" in model.lower():
-            actual_prompt = "/no_think\n" + actual_prompt
+        """Call Ollama Chat API (supports think: false for Thinking models)."""
+        model_lower = model.lower()
+        is_thinking_model = any(k in model_lower for k in
+                                ["qwen3", "abliterated", "think", "smallthinker"])
 
-        payload = json.dumps({
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system[:500]})
+        messages.append({"role": "user", "content": prompt[:1000]})
+
+        body: Dict[str, Any] = {
             "model": model,
-            "prompt": actual_prompt,
-            "system": system[:300] if system else "",
+            "messages": messages,
             "stream": False,
-            "options": {"num_predict": 300, "repeat_penalty": 1.3},
-        }).encode()
+            "options": {"num_predict": 400, "repeat_penalty": 1.3},
+        }
+        # Disable thinking for fast responses (orchestrator tasks don't need CoT)
+        if is_thinking_model:
+            body["think"] = False
+
+        payload = json.dumps(body).encode()
 
         try:
             req = urllib.request.Request(
-                self.ollama_url + "/api/generate",
+                self.ollama_url + "/api/chat",
                 data=payload, method="POST",
                 headers={"Content-Type": "application/json"},
             )
             resp = urllib.request.urlopen(req, timeout=120)
             data = json.loads(resp.read())
+            msg = data.get("message", {})
             return {
-                "response": data.get("response", ""),
+                "response": msg.get("content", ""),
                 "success": True,
                 "eval_count": data.get("eval_count", 0),
                 "eval_duration": data.get("eval_duration", 0),
