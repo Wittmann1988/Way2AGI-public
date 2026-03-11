@@ -22,7 +22,16 @@ class Way2AGIConfig(BaseSettings):
     OPENROUTER_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    XAI_API_KEY: str = ""
     HF_TOKEN: str = ""
+
+    # === Cloud Models (newest available) ===
+    CLOUD_MODELS: dict = {
+        "openai": {"model": "gpt-5.4", "fallback": "gpt-5.3-chat-latest", "env": "OPENAI_API_KEY", "url": "https://api.openai.com/v1/chat/completions"},
+        "xai": {"model": "grok-4.20-multi-agent-beta-0309-reasoning", "fallback": "grok-3", "env": "XAI_API_KEY", "url": "https://api.x.ai/v1/chat/completions"},
+        "gemini": {"model": "gemini-2.5-pro", "fallback": "gemini-2.5-flash", "env": "GEMINI_API_KEY", "url": "https://generativelanguage.googleapis.com/v1beta"},
+        "groq": {"model": "llama-3.3-70b-versatile", "env": "GROQ_API_KEY", "url": "https://api.groq.com/openai/v1/chat/completions"},
+    }
 
     # === Resource Budget ===
     MAX_GPU_HOURS_PER_DAY: float = 8.0
