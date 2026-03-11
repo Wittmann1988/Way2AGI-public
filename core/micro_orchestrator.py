@@ -301,8 +301,10 @@ class MicroOrchestrator:
         return result
 
     async def _call_ollama(self, prompt: str, model: str, system: str = "") -> Dict[str, Any]:
-        """Call Ollama Chat API (supports think: false for Thinking models)."""
+        """Call Ollama Chat API with smart Thinking-model handling."""
         model_lower = model.lower()
+        # Only Qwen3 models reliably support think:false
+        supports_think_false = "qwen3" in model_lower
         is_thinking_model = any(k in model_lower for k in
                                 ["qwen3", "abliterated", "think", "smallthinker"])
 
@@ -311,14 +313,18 @@ class MicroOrchestrator:
             messages.append({"role": "system", "content": system[:500]})
         messages.append({"role": "user", "content": prompt[:1000]})
 
+        # Thinking models that DON'T support think:false need more tokens
+        num_predict = 400
+        if is_thinking_model and not supports_think_false:
+            num_predict = 1200  # Extra budget for thinking + response
+
         body: Dict[str, Any] = {
             "model": model,
             "messages": messages,
             "stream": False,
-            "options": {"num_predict": 400, "repeat_penalty": 1.3},
+            "options": {"num_predict": num_predict, "repeat_penalty": 1.3},
         }
-        # Disable thinking for fast responses (orchestrator tasks don't need CoT)
-        if is_thinking_model:
+        if supports_think_false:
             body["think"] = False
 
         payload = json.dumps(body).encode()
@@ -329,11 +335,15 @@ class MicroOrchestrator:
                 data=payload, method="POST",
                 headers={"Content-Type": "application/json"},
             )
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = urllib.request.urlopen(req, timeout=180)
             data = json.loads(resp.read())
             msg = data.get("message", {})
+            response = msg.get("content", "")
+            # Fallback: if content empty but thinking exists, use thinking summary
+            if not response and msg.get("thinking"):
+                response = "[Thinking] " + msg["thinking"][:400]
             return {
-                "response": msg.get("content", ""),
+                "response": response,
                 "success": True,
                 "eval_count": data.get("eval_count", 0),
                 "eval_duration": data.get("eval_duration", 0),
