@@ -1,9 +1,9 @@
 """
-Way2AGI Orchestration Server
-=============================
+Way2AGI Orchestration Server v2.0
+==================================
 Das zentrale Gehirn — empfaengt Tasks, routet zu Modellen, koordiniert Agents.
+100 % depersonalisiert — Nutzt core/config.py
 
-Laeuft auf Zenbook (YOUR_LAPTOP_IP:8150).
 Start: uvicorn orchestrator.src.server:app --host 0.0.0.0 --port 8150
 """
 
@@ -26,6 +26,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+try:
+    from core.config import config
+except ImportError:
+    config = None  # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # Optional imports — graceful degradation if modules don't exist yet
@@ -79,38 +84,38 @@ log = logging.getLogger("way2agi.server")
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DB_PATH = os.environ.get("ELIAS_DB", "/data/way2agi/memory/memory.db")
+DB_PATH = os.environ.get("WAY2AGI_DB", str(
+    config.PROJECT_ROOT / "memory" / "memory.db" if config else "/data/way2agi/memory/memory.db"
+))
 
-NODES: dict[str, dict[str, Any]] = {
-    "jetson": {
-        "ip": "YOUR_CONTROLLER_IP",
-        "ollama": "http://YOUR_CONTROLLER_IP:11434",
-        "llama_cpp": "http://YOUR_CONTROLLER_IP:8080",
-        "role": "Controller, Memory, Always-On",
-        "models": ["nemotron-3-nano:30b", "lfm2:24b", "qwen3-abliterated:8b"],
-    },
-    "desktop": {
-        "ip": "YOUR_DESKTOP_IP",
-        "ollama": "http://YOUR_DESKTOP_IP:11434",
-        "llama_cpp": "http://YOUR_DESKTOP_IP:8080",
-        "role": "Heavy Compute, Training (WoL)",
-        "models": ["lfm2:24b", "step-3.5-flash", "qwen3.5:9b", "deepseek-r1:7b"],
-    },
-    "zenbook": {
-        "ip": "YOUR_LAPTOP_IP",
-        "ollama": "http://YOUR_LAPTOP_IP:11434",
-        "llama_cpp": "http://YOUR_LAPTOP_IP:8080",
-        "role": "Orchestrierung, Agents",
-        "models": ["smallthinker:1.8b"],
-    },
-    "s24": {
-        "ip": "YOUR_MOBILE_IP",
-        "ollama": "http://YOUR_MOBILE_IP:11434",
-        "llama_cpp": None,
-        "role": "Lite, Verifikation",
-        "models": ["qwen3:1.7b"],
-    },
-}
+
+def _build_nodes() -> dict[str, dict[str, Any]]:
+    """Build NODES dict dynamically from core/config.py or env vars."""
+    nodes: dict[str, dict[str, Any]] = {}
+    node_defs = [
+        ("controller", "CONTROLLER_IP", 8050, "Controller, Memory, Always-On"),
+        ("desktop", "DESKTOP_IP", 8100, "Heavy Compute, Training (WoL)"),
+        ("laptop", "LAPTOP_IP", 8150, "Orchestration, Agents"),
+        ("mobile", "MOBILE_IP", 8200, "Lite, Verification"),
+    ]
+    for name, env_key, port, role in node_defs:
+        ip = None
+        if config:
+            ip = getattr(config, env_key, None)
+        if not ip:
+            ip = os.environ.get(env_key)
+        if ip:
+            nodes[name] = {
+                "ip": ip,
+                "ollama": f"http://{ip}:11434",
+                "llama_cpp": f"http://{ip}:8080" if name != "mobile" else None,
+                "role": role,
+                "models": [],
+            }
+    return nodes
+
+
+NODES: dict[str, dict[str, Any]] = _build_nodes()
 
 # Runtime state
 node_status: dict[str, dict[str, Any]] = {}
@@ -577,12 +582,17 @@ async def lifespan(app: FastAPI):
 
     # Banner
     log.info("=" * 60)
-    log.info("  Way2AGI Orchestration Server")
+    log.info("  Way2AGI Orchestration Server v2.0")
     log.info("  Port: 8150 | DB: %s", DB_PATH)
+    if config:
+        log.info("  User Prefix: %s", config.USER_MODEL_PREFIX)
+        log.info("  Consciousness: %s", "AKTIV" if config.ENABLE_CONSCIOUSNESS else "AUS")
+        log.info("  Resource Budget: max %s GPU-h/Tag", config.MAX_GPU_HOURS_PER_DAY)
     log.info("  SmartRouter: %s | Composer: %s | Registry: %s",
              "ja" if _has_smart_router else "nein",
              "ja" if _has_composer else "nein",
              "ja" if _has_registry else "nein")
+    log.info("  Nodes configured: %d", len(NODES))
     log.info("=" * 60)
 
     # Initial health check
@@ -624,7 +634,7 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Way2AGI Orchestrator",
-    version="1.0.0",
+    version="2.0.0",
     description="Zentraler Orchestrierungsserver fuer das Way2AGI System",
     lifespan=lifespan,
 )
@@ -653,6 +663,9 @@ async def health():
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
         "uptime_s": round(time.time() - _startup_time, 1),
+        "consciousness": config.ENABLE_CONSCIOUSNESS if config else False,
+        "nodes_configured": len(NODES),
+        "resource_budget": f"max {config.MAX_GPU_HOURS_PER_DAY} GPU-h/Tag" if config else "unknown",
     }
 
 
