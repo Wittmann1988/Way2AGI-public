@@ -1,1 +1,1 @@
-# core/evolution/ — Self-Evolving Engine
+# core/evolution/ — Self-Evolving Engine + Group-Evolving Agents (GEA)
