@@ -119,7 +119,7 @@ class DiagnosticsScreen(Screen):
         log.write("[bold cyan]═══ Memory Server ═══[/]\n")
 
         # Memory Server
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=5.0) as client:

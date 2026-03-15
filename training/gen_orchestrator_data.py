@@ -6,15 +6,15 @@ import urllib.request
 import time
 import sys
 
-API_KEY = "os.environ.get("OPENAI_API_KEY", "")"
+API_KEY = os.environ.get("OPENAI_API_KEY", "")
 MODEL = "gpt-4o-mini"
-OUTPUT = "/data/data/com.termux/files/home/repos/Way2AGI/training/artifacts/orchestrator-chatgpt.jsonl"
+OUTPUT = "./training/artifacts/orchestrator-chatgpt.jsonl"
 URL = "https://api.openai.com/v1/chat/completions"
 
 SYSTEM_PROMPT = (
     "Du bist der Way2AGI Orchestrator. Du verteilst Tasks optimal auf verfuegbare "
-    "Compute-Nodes: Jetson Orin (64GB, 9 lokale Modelle, Always-On), Desktop YOUR_GPU "
-    "(32GB VRAM, Heavy Compute), Zenbook (NPU, leichte Tasks), S24 (1.7B Modell, "
+    "Compute-Nodes: Inference Node (64GB, 9 lokale Modelle, Always-On), Desktop RTX 5090 "
+    "(32GB VRAM, Heavy Compute), npu-node (NPU, leichte Tasks), S24 (1.7B Modell, "
     "Verifikation). Plus Cloud: Groq (ultra-fast), OpenRouter (Step-Flash, Qwen-Coder), "
     "Grok (4.1). Routing-Regeln: Security->Desktop Abliterated, Code->Qwen-Coder, "
     "Reasoning->Step-Flash, Speed->Groq, Default->Nemotron. Du optimierst fuer Kosten, "
@@ -34,7 +34,7 @@ USER_PROMPTS = [
     "Der Desktop ist offline. Wie verteilst du Security-Tasks um?",
     "Alle Nodes sind ausgelastet zu 80%. Ein dringender Code-Review kommt rein. Was tust du?",
     "Ich habe 3 Tasks gleichzeitig: Code-Generierung, Textanalyse, und ein Quick-Check. Verteilung?",
-    "Der Jetson hat nur noch 8GB RAM frei. Wie gehst du mit neuen Anfragen um?",
+    "Der Inference Node hat nur noch 8GB RAM frei. Wie gehst du mit neuen Anfragen um?",
     "Wir haben Budget-Limit fuer Cloud-API erreicht. Nur lokale Ressourcen verfuegbar. Strategie?",
 
     # Model Selection (12-16)
@@ -52,13 +52,13 @@ USER_PROMPTS = [
 
     # Fallback Strategies (21-24)
     "Groq API gibt 429 Too Many Requests. Was ist der Fallback-Plan?",
-    "Der Jetson ist nicht erreichbar und der Desktop schlaeft. Was tun bei einer dringenden Anfrage?",
-    "Ein Modell auf dem Jetson gibt nur Muell aus. Wie reagierst du?",
+    "Der Inference Node ist nicht erreichbar und der Desktop schlaeft. Was tun bei einer dringenden Anfrage?",
+    "Ein Modell auf dem Inference Node gibt nur Muell aus. Wie reagierst du?",
     "Die Internet-Verbindung ist instabil. Wie sicherst du laufende Tasks ab?",
 
     # Load Balancing (25-27)
     "Es kommen 20 Anfragen gleichzeitig. Erstelle einen Verteilungsplan.",
-    "Wie priorisierst du wenn the user eine Anfrage stellt vs ein automatischer Cron-Job?",
+    "Wie priorisierst du wenn the operator eine Anfrage stellt vs ein automatischer Cron-Job?",
     "Beschreibe deinen Algorithmus fuer optimales Load Balancing ueber alle 4 Nodes.",
 
     # Multi-Node Coordination (28-29)

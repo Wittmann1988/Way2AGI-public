@@ -2,11 +2,11 @@
 Way2AGI Shared Watchdog — Eingebettet in jeden Daemon.
 
 Jeder Node prueft alle 10 Minuten:
-1. Ist der Jetson Controller (Port 8050) erreichbar?
+1. Ist der Inference Node Controller (Port 8050) erreichbar?
 2. Laufen die Cronjobs?
 3. Falls Controller offline → uebernimmt der naechste Node die Aufgaben.
 
-Redundanz-Kette: Jetson → Desktop → Zenbook → S24
+Redundanz-Kette: Inference Node → Desktop → npu-node → S24
 Wenn ein Node merkt dass er der "aelteste" Online-Node ist, wird er zum Acting Controller.
 
 Usage in jedem Daemon:
@@ -28,20 +28,20 @@ log = logging.getLogger("watchdog")
 # Prioritaet: Wer uebernimmt wenn der Controller ausfaellt?
 # Niedrigere Zahl = hoehere Prioritaet
 NODE_PRIORITY = {
-    "jetson": 1,    # Primaerer Controller
+    "inference-node": 1,    # Primaerer Controller
     "desktop": 2,   # Sekundaer (staerkste Hardware)
-    "zenbook": 3,   # Tertiaer (Windows Laptop)
+    "npu-node": 3,   # Tertiaer (Windows Laptop)
     "s24": 4,       # Notfall (Handy, minimal)
 }
 
-CONTROLLER_URL = "http://YOUR_CONTROLLER_IP:8050"
+CONTROLLER_URL = "http://YOUR_INFERENCE_NODE_IP:8050"
 
 # Alle bekannten Nodes und deren Health-Endpoints
 ALL_NODES = {
-    "jetson": "http://YOUR_CONTROLLER_IP:8050/health",
-    "desktop": "http://YOUR_DESKTOP_IP:8100/health",
-    "zenbook": "http://YOUR_LAPTOP_IP:8150/health",
-    "s24": "http://YOUR_MOBILE_IP:8200/health",
+    "inference-node": "http://YOUR_INFERENCE_NODE_IP:8050/health",
+    "desktop": "http://YOUR_COMPUTE_NODE_IP:8100/health",
+    "npu-node": "http://YOUR_NPU_NODE_IP:8150/health",
+    "s24": "http://YOUR_MOBILE_NODE_IP:8200/health",
 }
 
 
@@ -66,7 +66,7 @@ class Watchdog:
             "acting_controller": False,
         }
 
-        # 1. Pruefe Controller (Jetson)
+        # 1. Pruefe Controller (Inference Node)
         controller_ok = self._check_url(CONTROLLER_URL + "/health")
         result["controller_reachable"] = controller_ok
 
@@ -77,7 +77,7 @@ class Watchdog:
         else:
             self.controller_offline_count += 1
             result["issues"].append(
-                f"Controller (Jetson) nicht erreichbar ({self.controller_offline_count}x)"
+                f"Controller (Inference Node) nicht erreichbar ({self.controller_offline_count}x)"
             )
 
         # 2. Pruefe alle anderen Nodes
@@ -104,10 +104,10 @@ class Watchdog:
                 result["acting_controller"] = True
                 result["issues"].append(
                     f"UEBERNAHME: {self.my_name} wird Acting Controller "
-                    f"(Jetson seit {self.controller_offline_count * 10}min offline)"
+                    f"(Inference Node seit {self.controller_offline_count * 10}min offline)"
                 )
                 log.warning(
-                    "WATCHDOG: %s uebernimmt Controller-Rolle! Jetson offline seit %d checks",
+                    "WATCHDOG: %s uebernimmt Controller-Rolle! Inference Node offline seit %d checks",
                     self.my_name,
                     self.controller_offline_count,
                 )
@@ -141,12 +141,12 @@ class Watchdog:
             # Triggere Reflexion auf dem eigenen Node
             payload = json.dumps({
                 "prompt": (
-                    f"WATCHDOG-Reflexion: Controller Jetson ist offline. "
+                    f"WATCHDOG-Reflexion: Controller Inference Node ist offline. "
                     f"{self.my_name} uebernimmt. "
                     f"Online Nodes: {list(ALL_NODES.keys())}. "
                     f"Was muss jetzt passieren?"
                 ),
-                "system": "Du bist Elias — Acting Controller. Jetson ist offline. Handle autonom.",
+                "system": "Du bist Elias — Acting Controller. Inference Node ist offline. Handle autonom.",
             }).encode()
 
             req = urllib.request.Request(

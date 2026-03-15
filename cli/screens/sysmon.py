@@ -153,14 +153,14 @@ class SystemMonitorScreen(Screen):
 
         syslog.write("[bold cyan]Recent Activity[/]\n")
 
-        # Try to read Way2AGI action log from Jetson
+        # Try to read Way2AGI action log from Inference Node
         try:
             import httpx
             async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get("http://YOUR_CONTROLLER_IP:8050/health")
+                resp = await client.get("http://YOUR_INFERENCE_NODE_IP:8050/health")
                 if resp.status_code == 200:
                     data = resp.json()
-                    syslog.write(f"[green]●[/] Jetson Daemon: {data.get('status', 'online')}")
+                    syslog.write(f"[green]●[/] Inference Node Daemon: {data.get('status', 'online')}")
                     uptime = data.get("uptime", "?")
                     syslog.write(f"  Uptime: {uptime}")
                     version = data.get("version", "?")
@@ -176,14 +176,14 @@ class SystemMonitorScreen(Screen):
                             else:
                                 syslog.write(f"  {ev}")
         except Exception:
-            syslog.write("[red]●[/] Jetson Daemon: Nicht erreichbar")
+            syslog.write("[red]●[/] Inference Node Daemon: Nicht erreichbar")
 
         syslog.write("")
 
         # Memory server status
         try:
             import httpx
-            server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+            server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{server_url}/health")
                 if resp.status_code == 200:
@@ -211,12 +211,12 @@ class SystemMonitorScreen(Screen):
             syslog.write("[dim]●[/] Local Ollama: Not running")
 
         syslog.write("")
-        syslog.write("[dim]Cronjobs (Jetson):[/]")
+        syslog.write("[dim]Cronjobs (Inference Node):[/]")
         syslog.write("  07:00 research.py — arXiv + GitHub")
         syslog.write("  08:00/14:00/20:00 goalguard.py — Regel-Pruefung")
         syslog.write("  12:00 roundtable.py — Multi-Model Discussion")
         syslog.write("  16:00 implement.py — Code Generation")
-        syslog.write("  alle 5 Tage training.py — SFT/DPO on YOUR_GPU")
+        syslog.write("  alle 5 Tage training.py — SFT/DPO on RTX 5090")
 
     async def action_refresh(self) -> None:
         await self._refresh_all()

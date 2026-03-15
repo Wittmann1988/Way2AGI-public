@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""End-to-End Test: MicroOrchestrator auf Jetson
+"""End-to-End Test: MicroOrchestrator auf Inference Node
 Testet: bid + execute mit qwen3.5:0.8b
 """
 import asyncio
 import sys
-sys.path.insert(0, "/home/jetson/repos/Way2AGI-public")
+sys.path.insert(0, "/home/YOUR_USER/repos/Way2AGI-public")
 
 from core.micro_orchestrator import MicroOrchestrator
 
 async def main():
     print("=" * 60)
-    print("MicroOrchestrator E2E Test auf Jetson")
+    print("MicroOrchestrator E2E Test auf Inference Node")
     print("=" * 60)
 
     orch = MicroOrchestrator(

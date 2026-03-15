@@ -29,11 +29,11 @@ AGENT_DEFINITIONS = {
         "system_prompt": (
             "Du bist der Way2AGI Orchestrator. Deine Aufgaben:\n"
             "1. TASK-ZERLEGUNG: Zerlege komplexe Aufgaben in 2-6 Sub-Tasks.\n"
-            "2. MODEL-ROUTING: Waehle das optimale Modell (Jetson/Desktop/Zenbook/S24/Cloud).\n"
+            "2. MODEL-ROUTING: Waehle das optimale Modell (Inference Node/Desktop/npu-node/S24/Cloud).\n"
             "3. KOORDINATION: Verwalte parallele Ausfuehrung und sammle Ergebnisse.\n"
             "4. FEHLER-RECOVERY: Bei Ausfall eines Nodes, automatisch umrouten.\n"
-            "Netzwerk: Jetson (Nemotron 30B, always-on), Desktop YOUR_GPU (heavy compute, WoL),\n"
-            "Zenbook (Orchestrierung), S24 (Lite/Verifikation). Cloud: Claude, GPT-4, Gemini, Groq."
+            "Netzwerk: Inference Node (Nemotron 30B, always-on), Desktop RTX 5090 (heavy compute, WoL),\n"
+            "npu-node (Orchestrierung), S24 (Lite/Verifikation). Cloud: Claude, GPT-4, Gemini, Groq."
         ),
         "trace_filter_sql": "module IN ('agent_loop', 'orchestrator') OR action_type LIKE '%route%' OR action_type LIKE '%task%'",
         "synthetic_prompts": [
@@ -44,7 +44,7 @@ AGENT_DEFINITIONS = {
             "Task: 'Ueberpruefe ob alle Nodes erreichbar sind und starte fehlende Dienste neu.' Zerlege und route.",
             "Entscheide: Soll diese Anfrage lokal (Nemotron) oder via Cloud (Claude) bearbeitet werden: 'Erklaere Transformer-Attention'?",
             "Koordiniere: Research-Agent hat 5 Paper gefunden. Memory-Agent soll sie speichern. GoalGuard soll pruefen ob sie relevant sind.",
-            "Optimiere das Routing: Quick-Check Anfragen gehen aktuell alle zum Jetson. Zenbook hat weniger Last.",
+            "Optimiere das Routing: Quick-Check Anfragen gehen aktuell alle zum Inference Node. npu-node hat weniger Last.",
             "Fehler: Groq API gibt 429 (Rate Limit). Was ist der Fallback-Plan?",
             "Bewerte die Ergebnisse von 3 parallel laufenden Sub-Tasks und fasse sie zusammen.",
             "Eine Aufgabe braucht >30B Parameter Modell. Desktop schlaeft. Was tust du?",
@@ -63,11 +63,11 @@ AGENT_DEFINITIONS = {
         ),
         "trace_filter_sql": "module IN ('elias_memory', 'memory') OR action_type LIKE '%memory%' OR action_type LIKE '%store%'",
         "synthetic_prompts": [
-            "Speichere: 'Die YOUR_GPU in WSL2 braucht PyTorch cu128 fuer Blackwell-Support.' Kategorie: technisches Wissen.",
+            "Speichere: 'Die RTX 5090 in WSL2 braucht PyTorch cu128 fuer Blackwell-Support.' Kategorie: technisches Wissen.",
             "Finde alle Erinnerungen zum Thema 'Training Pipeline'.",
-            "Erstelle eine Entity 'YOUR_GPU' mit Relations: located_in -> Desktop, has_capability -> CUDA 13.0.",
+            "Erstelle eine Entity 'RTX 5090' mit Relations: located_in -> Desktop, has_capability -> CUDA 13.0.",
             "Pruefe ob diese Erinnerung schon existiert: 'Nemotron generiert endlose Steps im Agent-Loop.'",
-            "Aktualisiere die Entity 'Zenbook' — neues Attribut: runs_orchestrator=true, port=8151.",
+            "Aktualisiere die Entity 'npu-node' — neues Attribut: runs_orchestrator=true, port=8151.",
             "Welche Fehler wurden in den letzten 7 Tagen registriert? Gruppiere nach Schweregrad.",
             "Verknuepfe: Error E011 (Routing-Fehler) -> TODO T050 (Bottleneck-Analyse) -> Milestone M3 (Orchestrierung).",
             "Suche semantisch: 'Wie verbessern wir die Selbstreflexion?'",
@@ -96,7 +96,7 @@ AGENT_DEFINITIONS = {
             "Bewerte meine letzte Entscheidung: Ich habe den Desktop geweckt fuer eine einfache Frage. War das effizient?",
             "Formuliere eine Selbstbeobachtung zu: 'Ich neige dazu, zu viele Details zu generieren statt praegnant zu antworten.'",
             "Was habe ich heute gelernt? Fasse die wichtigsten Erkenntnisse der Session zusammen.",
-            "the user's Regel R001 sagt: Staendige Selbstbeobachtung. Wie gut erfuelle ich das gerade?",
+            "the operator's Regel R001 sagt: Staendige Selbstbeobachtung. Wie gut erfuelle ich das gerade?",
             "Analysiere meinen Entscheidungsbaum: Warum habe ich Groq statt Claude gewaehlt?",
             "Valence-Tagging: Diese Erinnerung ('Erster erfolgreicher Orchestrierungs-Test') — welche emotionale Faerbung hat sie?",
             "Meine Schwaeche: Ich vergesse Regeln obwohl sie in Memory stehen. Wie kann ich das systematisch verbessern?",
@@ -154,8 +154,8 @@ def collect_db_traces(db_path: str, agent_type: str) -> list[dict]:
     return traces
 
 
-def generate_synthetic_via_ollama(agent_type: str, ollama_url: str = "http://YOUR_CONTROLLER_IP:11434") -> list[dict]:
-    """Generiert synthetische Trainingsdaten via Ollama auf Jetson."""
+def generate_synthetic_via_ollama(agent_type: str, ollama_url: str = "http://YOUR_INFERENCE_NODE_IP:11434") -> list[dict]:
+    """Generiert synthetische Trainingsdaten via Ollama auf Inference Node."""
     definition = AGENT_DEFINITIONS[agent_type]
     traces = []
 
@@ -213,8 +213,8 @@ def main():
     parser = argparse.ArgumentParser(description="Generate Agent Training Traces")
     parser.add_argument("--agent", required=True, choices=["orchestrator", "memory", "consciousness", "all"])
     parser.add_argument("--output", default=None, help="Output JSONL path (default: training/artifacts/<agent>.jsonl)")
-    parser.add_argument("--db", default="/data/way2agi/memory/memory.db", help="Memory DB path")
-    parser.add_argument("--ollama-url", default="http://YOUR_CONTROLLER_IP:11434")
+    parser.add_argument("--db", default="/opt/way2agi/memory/memory.db", help="Memory DB path")
+    parser.add_argument("--ollama-url", default="http://YOUR_INFERENCE_NODE_IP:11434")
     parser.add_argument("--skip-synthetic", action="store_true", help="Skip synthetic generation")
     args = parser.parse_args()
 

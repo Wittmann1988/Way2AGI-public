@@ -73,7 +73,7 @@ class ChatScreen(Screen):
         log.add_user_message(text)
         self.messages.append({"role": "user", "content": text})
 
-        # Memory recall from Jetson port 5555
+        # Memory recall from Inference Node port 5555
         context = await self._recall_memory(text)
         if context:
             log.add_system_message("[Memory: relevante Erinnerungen injiziert]")
@@ -133,7 +133,7 @@ class ChatScreen(Screen):
     async def _recall_memory(self, query: str) -> str | None:
         if not self.config.get("memory.enabled") or not self.config.get("memory.auto_recall"):
             return None
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -159,7 +159,7 @@ class ChatScreen(Screen):
     async def _store_memory(self, user_msg: str, assistant_msg: str) -> None:
         if not self.config.get("memory.enabled") or not self.config.get("memory.auto_store"):
             return
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -210,7 +210,7 @@ class ChatScreen(Screen):
                 log.add_system_message("Befehle: /memory search <query>")
         elif command == "/inject":
             if arg:
-                server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+                server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
                 try:
                     import httpx
                     async with httpx.AsyncClient(timeout=5.0) as client:

@@ -56,14 +56,14 @@ CREATE TABLE IF NOT EXISTS endgoal (
     metrics TEXT,
     target_date TEXT,
     last_reviewed TEXT,
-    reviewed_by TEXT DEFAULT 'erik',
+    reviewed_by TEXT DEFAULT 'operator',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS rules (
     id TEXT PRIMARY KEY,
     rule_text TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'erik',
+    source TEXT NOT NULL DEFAULT 'operator',
     priority INTEGER NOT NULL DEFAULT 50,
     condition TEXT,
     action TEXT,

@@ -1,7 +1,7 @@
 # Way2AGI Terminal App — Design Document
 
 **Datum:** 2026-03-06
-**Autor:** the user + Claude Opus 4.6
+**Autor:** YOUR_NAME + Claude Opus 4.6
 **Status:** Approved
 
 ## Zwischenziel

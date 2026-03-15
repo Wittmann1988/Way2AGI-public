@@ -14,7 +14,7 @@
     "start": "node gateway/dist/daemon.js",
     "daemon": "node gateway/dist/daemon.js --daemon"
   },
-  "author": "the user <YOUR_EMAIL>",
+  "author": "YOUR_NAME <YOUR_EMAIL>",
   "license": "MIT",
   "repository": {
     "type": "git",

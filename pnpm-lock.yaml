@@ -768,7 +768,7 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
-  '@types/estrYOUR_SSH_USER@1.0.8':
+  '@types/estrYOUR_USER@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
   '@types/node@22.19.13':
@@ -1845,7 +1845,7 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
-  '@types/estrYOUR_SSH_USER@1.0.8': {}
+  '@types/estrYOUR_USER@1.0.8': {}
 
   '@types/node@22.19.13':
     dependencies:

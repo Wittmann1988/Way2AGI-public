@@ -25,7 +25,7 @@ services:
     volumes:
       - memory-data:/app/data
     environment:
-      - MEMORY_DB_PATH=/app/data/way2agi_memory.db
+      - MEMORY_DB_PATH=/app/opt/way2agi_memory.db
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
       - REDIS_URL=redis://redis:6379

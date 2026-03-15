@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Jetson-Only Discussion v2: Memory-System Bewertung
+Inference Node-Only Discussion v2: Memory-System Bewertung
 Verbesserte System-Prompts + schnellere Modelle
 """
 import asyncio

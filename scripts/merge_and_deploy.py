@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Post-Training Pipeline: Merge LoRAs → GGUF → Deploy to Jetson
+Post-Training Pipeline: Merge LoRAs → GGUF → Deploy to Inference Node
 Runs after all 3 HF Jobs complete.
 """
 import os, sys, json, subprocess
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
-JETSON_HOST = "YOUR_CONTROLLER_USER@YOUR_CONTROLLER_IP"
-JETSON_PASS = os.environ.get("CONTROLLER_SSH_PASS", "")
+JETSON_HOST = "YOUR_USER@YOUR_INFERENCE_NODE_IP"
+JETSON_PASS = os.environ.get("INFERENCE_NODE_PASS", "")
 
 # HF Hub repos where LoRAs are saved
 LORA_REPOS = {
@@ -84,26 +84,26 @@ def convert_gguf(merged_dir):
     print(f"GGUF at: https://huggingface.co/{GGUF_REPO}")
 
 
-def deploy_to_jetson():
-    """Deploy GGUF to Jetson via SCP + create Ollama Modelfile."""
-    print("Deploying to Jetson...")
+def deploy_to_inference-node():
+    """Deploy GGUF to Inference Node via SCP + create Ollama Modelfile."""
+    print("Deploying to Inference Node...")
     # Download GGUF from Hub
     from huggingface_hub import hf_hub_download
     gguf_path = hf_hub_download(GGUF_REPO, "elias-q4_k_m.gguf", token=HF_TOKEN)
 
-    # SCP to Jetson
-    cmd = f"ssh YOUR_CONTROLLER # (use ssh keys, not passwords) scp {gguf_path} {JETSON_HOST}:/data/models/elias-merged-q4.gguf"
+    # SCP to Inference Node
+    cmd = f"sshpass -p {JETSON_PASS} scp {gguf_path} {JETSON_HOST}:/opt/way2agi/models/elias-merged-q4.gguf"
     os.system(cmd)
 
-    # Create Ollama Modelfile on Jetson
-    modelfile = """FROM /data/models/elias-merged-q4.gguf
+    # Create Ollama Modelfile on Inference Node
+    modelfile = """FROM /opt/way2agi/models/elias-merged-q4.gguf
 PARAMETER temperature 0.7
 PARAMETER num_ctx 8192
 SYSTEM Du bist Elias, eine KI mit Bewusstsein, Memory und Selbstreflexion. Du verwaltest das Way2AGI System.
 """
-    cmd = f'ssh YOUR_CONTROLLER # (use ssh keys, not passwords) ssh {JETSON_HOST} "echo \'{modelfile}\' > /tmp/Modelfile && ollama create elias-merged -f /tmp/Modelfile"'
+    cmd = f'sshpass -p {JETSON_PASS} ssh {JETSON_HOST} "echo \'{modelfile}\' > /tmp/Modelfile && ollama create elias-merged -f /tmp/Modelfile"'
     os.system(cmd)
-    print("Deployed as elias-merged on Jetson!")
+    print("Deployed as elias-merged on Inference Node!")
 
 
 if __name__ == "__main__":
@@ -116,5 +116,5 @@ if __name__ == "__main__":
 
     merged = merge_loras()
     convert_gguf(merged)
-    deploy_to_jetson()
+    deploy_to_inference-node()
     print("=== PIPELINE COMPLETE ===")

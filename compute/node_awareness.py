@@ -1,7 +1,7 @@
 """
 Way2AGI Node Awareness — Shared Module fuer alle Daemons.
 
-Jeder Node (Jetson, Desktop, Zenbook, S24) importiert dieses Modul.
+Jeder Node (Inference Node, Desktop, npu-node, S24) importiert dieses Modul.
 Es gibt ihm:
 1. Aufgaben-Bewusstsein — kennt aktuelle TODOs und Prioritaeten
 2. Regel-Bewusstsein — prueft GoalGuard bei jeder Aktion
@@ -76,7 +76,7 @@ class NodeAwareness:
         },
         "E011": {
             "name": "Alle Modelle BLOCKER",
-            "check": "Groq? Gemini? OpenAI? OpenRouter? Sidekick? Desktop? Jetson?",
+            "check": "Groq? Gemini? OpenAI? OpenRouter? Sidekick? Desktop? Inference Node?",
             "severity": "block",
             "keywords": ["agent", "dispatch", "roundtable"],
         },
@@ -193,7 +193,7 @@ class NodeAwareness:
         # 2. Temp-Dateien aufraumen (plattformabhaengig)
         system = platform.system()
         if system == "Linux":
-            tmp_dirs = ["/tmp/way2agi_*", "/tmp/jetson_daemon*"]
+            tmp_dirs = ["/tmp/way2agi_*", "/tmp/inference_daemon*"]
             # Auf Android/Termux
             prefix_tmp = os.environ.get("PREFIX", "") + "/tmp"
             if os.path.exists(prefix_tmp):

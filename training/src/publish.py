@@ -67,7 +67,7 @@ tokenizer = AutoTokenizer.from_pretrained("YOUR_HF_USER/elias-nemotron-30b")
 
 ## Built by
 
-the user (YOUR_GITHUB_USER) & Elias — [Way2AGI](https://github.com/YOUR_GITHUB_USER/Way2AGI)
+The operator (YOUR_GITHUB_USER) & Elias — [Way2AGI](https://github.com/YOUR_GITHUB_USER/Way2AGI)
 """
 
 

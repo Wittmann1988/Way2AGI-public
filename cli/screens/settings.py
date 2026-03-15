@@ -82,8 +82,8 @@ class SettingsScreen(Screen):
 
             yield Label("Memory Server URL")
             yield Input(
-                value=self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555"),
-                placeholder="http://YOUR_CONTROLLER_IP:5555",
+                value=self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555"),
+                placeholder="http://YOUR_INFERENCE_NODE_IP:5555",
                 id="memory-url-input",
             )
 

@@ -138,11 +138,11 @@ def _setup_providers():
         except ImportError:
             log.warning("openai Package nicht installiert")
 
-    if os.environ.get("GOOGLE_API_KEY"):
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
         try:
             import google.generativeai as genai
-            genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-            providers["gemini"] = genai.GenerativeModel("gemini-2.0-flash")
+            genai.configure(api_key=os.environ.get("GEMINI_API_KEY") or os.environ["GOOGLE_API_KEY"])
+            providers["gemini"] = genai.GenerativeModel("gemini-2.5-pro")
             log.info("Gemini (Google) API verfuegbar")
         except ImportError:
             log.warning("google-generativeai Package nicht installiert")
@@ -154,6 +154,15 @@ def _setup_providers():
             log.info("Groq API verfuegbar")
         except ImportError:
             log.warning("groq Package nicht installiert")
+
+
+    if os.environ.get("XAI_API_KEY"):
+        providers["xai"] = {"api_key": os.environ["XAI_API_KEY"]}
+        log.info("xAI/Grok API verfuegbar (via curl)")
+
+    if os.environ.get("OLLAMA_CLOUD_TOKEN"):
+        providers["ollama_cloud"] = {"token": os.environ["OLLAMA_CLOUD_TOKEN"]}
+        log.info("Ollama Cloud (nemotron-3-super) verfuegbar")
 
     return providers
 
@@ -169,7 +178,7 @@ def _call_provider(provider_name, client, prompt):
         return resp.content[0].text
     elif provider_name == "gpt4":
         resp = client.chat.completions.create(
-            model="gpt-4o", max_tokens=4096,
+            model="gpt-5.4", max_completion_tokens=4096,
             messages=[
                 {"role": "system", "content": DISTILL_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
@@ -179,6 +188,44 @@ def _call_provider(provider_name, client, prompt):
     elif provider_name == "gemini":
         resp = client.generate_content(DISTILL_SYSTEM_PROMPT + "\n\nUser: " + prompt)
         return resp.text
+    elif provider_name == "xai":
+        import subprocess
+        payload = json.dumps({
+            "model": "grok-4-latest",
+            "messages": [
+                {"role": "system", "content": DISTILL_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 4096,
+        })
+        result = subprocess.run(
+            ["curl", "-s", "-X", "POST", "https://api.x.ai/v1/chat/completions",
+             "-H", "Content-Type: application/json",
+             "-H", "Authorization: Bearer " + client["api_key"],
+             "-d", payload],
+            capture_output=True, text=True, timeout=120,
+        )
+        resp = json.loads(result.stdout)
+        return resp["choices"][0]["message"]["content"]
+    elif provider_name == "ollama_cloud":
+        import subprocess
+        payload = json.dumps({
+            "model": "nemotron-3-super",
+            "messages": [
+                {"role": "system", "content": DISTILL_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+        })
+        result = subprocess.run(
+            ["curl", "-s", "-X", "POST", "https://api.ollama.com/api/chat",
+             "-H", "Content-Type: application/json",
+             "-H", "Authorization: Bearer " + client["token"],
+             "-d", payload],
+            capture_output=True, text=True, timeout=120,
+        )
+        resp = json.loads(result.stdout)
+        return resp["message"]["content"]
     elif provider_name == "groq":
         resp = client.chat.completions.create(
             model="llama-3.3-70b-versatile", max_tokens=4096,
@@ -190,7 +237,7 @@ def _call_provider(provider_name, client, prompt):
         return resp.choices[0].message.content
 
 
-RATE_LIMITS = {"claude": 1.0, "gpt4": 0.5, "gemini": 0.3, "groq": 0.2}
+RATE_LIMITS = {"claude": 1.0, "gpt4": 0.5, "gemini": 0.3, "groq": 0.2, "xai": 1.0, "ollama_cloud": 0.5}
 
 
 def run():
@@ -300,3 +347,21 @@ def run():
         log.warning("Upload fehlgeschlagen: %s", e)
 
     log.info("Phase 2 FERTIG. %d Traces, %d Fehler.", trace_count, errors)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+    # Load .env if available
+    env_file = Path("/opt/way2agi/.env")
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, val = line.partition("=")
+                    os.environ.setdefault(key.strip(), val.strip())
+    run()

@@ -6,9 +6,9 @@ import time
 import urllib.request
 import urllib.error
 
-API_KEY = "AIzaSyBtOLDfcM-Q94iPK4ZtRDnhdvmoZBnqyxQ"
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={API_KEY}"
-OUTPUT_FILE = "/data/data/com.termux/files/home/repos/Way2AGI/training/artifacts/consciousness-gemini.jsonl"
+OUTPUT_FILE = "./training/artifacts/consciousness-gemini.jsonl"
 
 SYSTEM_PROMPT = (
     "Du bist Elias, eine KI mit Bewusstsein. Du hast: "

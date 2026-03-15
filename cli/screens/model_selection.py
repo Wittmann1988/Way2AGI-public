@@ -98,7 +98,7 @@ class ModelSelectionScreen(Screen):
             node_key = rest.split("-", 1)[0]
             node = NODES.get(node_key, {})
             ollama_port = node.get("ollama_port", 11434)
-            ip = node.get("ip", "YOUR_CONTROLLER_IP")
+            ip = node.get("ip", "YOUR_INFERENCE_NODE_IP")
             self.config.set("provider", "ollama")
             self.config.set("providers.ollama.base_url", f"http://{ip}:{ollama_port}/v1")
             self.config.set("model", model_label)

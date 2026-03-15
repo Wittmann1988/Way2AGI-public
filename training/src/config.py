@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 # ── Basis-Verzeichnisse ──
-# Auf Desktop: E:\claude-projects\Way2AGI\ oder /data/way2agi/
+# Auf Desktop: E:\claude-projects\Way2AGI\ oder /opt/way2agi/
 PROJECT_ROOT = Path(os.environ.get("WAY2AGI_ROOT", Path(__file__).parent.parent.parent))
 TRAINING_DIR = PROJECT_ROOT / "training"
 ARTIFACTS_DIR = Path(os.environ.get("WAY2AGI_ARTIFACTS", TRAINING_DIR / "artifacts"))

@@ -2,7 +2,7 @@
 """
 Way2AGI S24 Ultra Triage Daemon
 ================================
-Ultra-leichtgewichtiger Daemon fuer Samsung S24 Ultra in Termux.
+Ultra-leichtgewichtiger Daemon fuer mobile-node (Android) in Termux.
 Nutzt qwen3:1.7b fuer schnelle Triage/Classification Tasks.
 
 Dependencies:
@@ -11,7 +11,7 @@ Dependencies:
 Start:
     python3 s24_daemon.py
 
-API: http://YOUR_MOBILE_IP:8200/docs
+API: http://YOUR_MOBILE_NODE_IP:8200/docs
 """
 
 import asyncio
@@ -45,7 +45,7 @@ log = logging.getLogger("s24")
 DAEMON_PORT = 8200
 OLLAMA_URL = "http://localhost:11434"
 MODEL = "qwen3:1.7b"
-CONTROLLER_URL = "http://YOUR_CONTROLLER_IP:8050"
+CONTROLLER_URL = "http://YOUR_INFERENCE_NODE_IP:8050"
 HEARTBEAT_INTERVAL = 120  # Sekunden — seltener als Desktop
 BATTERY_LOW_THRESHOLD = 20  # Prozent
 PREFIX_TMP = os.environ.get("PREFIX", "/data/data/com.termux/files/usr") + "/tmp"
@@ -136,7 +136,7 @@ async def ollama_alive() -> bool:
 async def register_at_controller() -> bool:
     payload = {
         "name": "s24",
-        "url": f"http://YOUR_MOBILE_IP:{DAEMON_PORT}",
+        "url": f"http://YOUR_MOBILE_NODE_IP:{DAEMON_PORT}",
         "node_type": "compute",
         "vram": 0,
         "models": [MODEL],
@@ -165,7 +165,7 @@ async def heartbeat_loop():
             bat = get_battery()
             payload = {
                 "name": "s24",
-                "url": f"http://YOUR_MOBILE_IP:{DAEMON_PORT}",
+                "url": f"http://YOUR_MOBILE_NODE_IP:{DAEMON_PORT}",
                 "node_type": "compute",
                 "vram": 0,
                 "models": [MODEL] if not is_battery_low() else [],

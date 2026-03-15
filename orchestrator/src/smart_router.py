@@ -11,8 +11,8 @@ Replaces dumb round-robin / try-in-order with actual intelligence:
 Usage:
     router = SmartRouter()
     result = router.route("Write a Python parser for MIFARE dumps")
-    # => {"model": "nemotron-3-nano:30b", "endpoint": "http://YOUR_CONTROLLER_IP:8080",
-    #     "node": "jetson", "strategy": "local_inference"}
+    # => {"model": "nemotron-3-nano:30b", "endpoint": "http://YOUR_INFERENCE_NODE_IP:8080",
+    #     "node": "inference-node", "strategy": "local_inference"}
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class NodeState(str, Enum):
 @dataclass
 class Endpoint:
     """A single inference endpoint on a node."""
-    url: str                          # e.g. "http://YOUR_CONTROLLER_IP:8080"
+    url: str                          # e.g. "http://YOUR_INFERENCE_NODE_IP:8080"
     engine: str                       # "llama.cpp" | "ollama"
     health_path: str = "/health"      # Path to check liveness
     models: list[str] = field(default_factory=list)
@@ -97,18 +97,18 @@ class NodeStatus:
 # ---------------------------------------------------------------------------
 
 NODES: dict[str, NodeConfig] = {
-    "jetson": NodeConfig(
-        name="jetson",
-        ip="YOUR_CONTROLLER_IP",
+    "inference-node": NodeConfig(
+        name="inference-node",
+        ip="YOUR_INFERENCE_NODE_IP",
         endpoints=[
             Endpoint(
-                url="http://YOUR_CONTROLLER_IP:8080",
+                url="http://YOUR_INFERENCE_NODE_IP:8080",
                 engine="llama.cpp",
                 health_path="/health",
                 models=["nemotron-3-nano:30b", "lfm2:24b"],
             ),
             Endpoint(
-                url="http://YOUR_CONTROLLER_IP:11434",
+                url="http://YOUR_INFERENCE_NODE_IP:11434",
                 engine="ollama",
                 health_path="/api/tags",
                 models=["nemotron-3-nano:30b", "lfm2:24b", "smallthinker:1.8b"],
@@ -123,17 +123,17 @@ NODES: dict[str, NodeConfig] = {
     ),
     "desktop": NodeConfig(
         name="desktop",
-        ip="YOUR_DESKTOP_IP",
+        ip="YOUR_COMPUTE_NODE_IP",
         mac="XX:XX:XX:XX:XX:XX",  # TODO: fill in real MAC
         endpoints=[
             Endpoint(
-                url="http://YOUR_DESKTOP_IP:8080",
+                url="http://YOUR_COMPUTE_NODE_IP:8080",
                 engine="llama.cpp",
                 health_path="/health",
                 models=["lfm2:24b", "step-3.5-flash", "qwen3.5:9b"],
             ),
             Endpoint(
-                url="http://YOUR_DESKTOP_IP:11434",
+                url="http://YOUR_COMPUTE_NODE_IP:11434",
                 engine="ollama",
                 health_path="/api/tags",
                 models=["lfm2:24b", "step-3.5-flash", "qwen3.5:9b"],
@@ -147,18 +147,18 @@ NODES: dict[str, NodeConfig] = {
         is_gpu=True,
         can_sleep=True,
     ),
-    "zenbook": NodeConfig(
-        name="zenbook",
-        ip="YOUR_LAPTOP_IP",
+    "npu-node": NodeConfig(
+        name="npu-node",
+        ip="YOUR_NPU_NODE_IP",
         endpoints=[
             Endpoint(
-                url="http://YOUR_LAPTOP_IP:11434",
+                url="http://YOUR_NPU_NODE_IP:11434",
                 engine="ollama",
                 health_path="/api/tags",
                 models=["lfm2:24b", "smallthinker:1.8b", "qwen3:1.7b"],
             ),
             Endpoint(
-                url="http://YOUR_LAPTOP_IP:8080",
+                url="http://YOUR_NPU_NODE_IP:8080",
                 engine="llama.cpp",
                 health_path="/health",
                 models=["smallthinker:1.8b"],
@@ -171,10 +171,10 @@ NODES: dict[str, NodeConfig] = {
     ),
     "s24": NodeConfig(
         name="s24",
-        ip="YOUR_MOBILE_IP",
+        ip="YOUR_MOBILE_NODE_IP",
         endpoints=[
             Endpoint(
-                url="http://YOUR_MOBILE_IP:11434",
+                url="http://YOUR_MOBILE_NODE_IP:11434",
                 engine="ollama",
                 health_path="/api/tags",
                 models=["qwen3:1.7b"],
@@ -262,41 +262,41 @@ _TASK_PATTERNS: dict[TaskType, re.Pattern] = {
 _ROUTING_PREFS: dict[TaskType, list[tuple[str, Optional[str]]]] = {
     TaskType.CODING: [
         ("desktop", "lfm2:24b"),
-        ("jetson", "nemotron-3-nano:30b"),
+        ("inference-node", "nemotron-3-nano:30b"),
         # cloud fallback handled separately
     ],
     TaskType.REASONING: [
-        ("jetson", "nemotron-3-nano:30b"),
+        ("inference-node", "nemotron-3-nano:30b"),
         ("desktop", "lfm2:24b"),
     ],
     TaskType.ANALYSIS: [
-        ("jetson", "nemotron-3-nano:30b"),
+        ("inference-node", "nemotron-3-nano:30b"),
         ("desktop", "lfm2:24b"),
     ],
     TaskType.QUICK_CHECK: [
-        ("zenbook", "smallthinker:1.8b"),
+        ("npu-node", "smallthinker:1.8b"),
         ("s24", "qwen3:1.7b"),
-        ("jetson", "smallthinker:1.8b"),
+        ("inference-node", "smallthinker:1.8b"),
     ],
     TaskType.TRAINING: [
         ("desktop", None),  # Training ONLY on Desktop
     ],
     TaskType.SECURITY: [
-        ("jetson", "nemotron-3-nano:30b"),  # Abliterated models
+        ("inference-node", "nemotron-3-nano:30b"),  # Abliterated models
     ],
     TaskType.GERMAN: [
-        ("jetson", "nemotron-3-nano:30b"),
+        ("inference-node", "nemotron-3-nano:30b"),
         ("desktop", "lfm2:24b"),
-        ("zenbook", "lfm2:24b"),
+        ("npu-node", "lfm2:24b"),
     ],
     TaskType.SELF_REFLECTION: [
-        ("jetson", "nemotron-3-nano:30b"),
+        ("inference-node", "nemotron-3-nano:30b"),
         ("desktop", "lfm2:24b"),
     ],
     TaskType.UNKNOWN: [
-        ("jetson", "nemotron-3-nano:30b"),
+        ("inference-node", "nemotron-3-nano:30b"),
         ("desktop", "lfm2:24b"),
-        ("zenbook", "smallthinker:1.8b"),
+        ("npu-node", "smallthinker:1.8b"),
     ],
 }
 

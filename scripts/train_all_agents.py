@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Train ALL 3 Way2AGI Agents on Desktop YOUR_GPU.
+Train ALL 3 Way2AGI Agents on Desktop RTX 5090.
 Memory Agent → Consciousness Agent → Orchestrator → Merge LoRAs → GGUF
 """
 import json, os, sys, glob, logging
@@ -11,7 +11,7 @@ log = logging.getLogger("train-all")
 
 # ── Config ──
 # Nemotron-Nano-30B needs mamba-ssm (Linux only). Use Qwen3 8B on Windows.
-# After training, we merge and distill INTO Nemotron on Jetson (Linux).
+# After training, we merge and distill INTO Nemotron on Inference Node (Linux).
 BASE_MODEL = os.environ.get("BASE_MODEL", "Qwen/Qwen3-8B")
 ARTIFACTS = Path(os.environ.get("WAY2AGI_ARTIFACTS", r"E:\claude-projects\Way2AGI\training\artifacts"))
 OUTPUT_BASE = Path(os.environ.get("WAY2AGI_OUTPUT", r"E:\claude-projects\Way2AGI"))
@@ -32,7 +32,7 @@ AGENTS = {
     "orchestrator": {
         "traces": ["orchestrator-traces.jsonl", "orchestrator-chatgpt.jsonl"],
         "output": str(OUTPUT_BASE / "lora-orchestrator"),
-        "system": "Du bist der Way2AGI Orchestrator. Du verteilst Tasks auf Jetson (64GB), Desktop (YOUR_GPU), Zenbook (NPU), S24, und Cloud (Groq, OpenRouter, Grok). Du optimierst fuer Kosten, Latenz und Qualitaet. Antworte in Deutsch.",
+        "system": "Du bist der Way2AGI Orchestrator. Du verteilst Tasks auf Inference Node (64GB), Desktop (RTX 5090), npu-node (NPU), S24, und Cloud (Groq, OpenRouter, Grok). Du optimierst fuer Kosten, Latenz und Qualitaet. Antworte in Deutsch.",
         "epochs": 3,
     },
 }

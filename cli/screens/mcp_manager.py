@@ -19,12 +19,12 @@ KNOWN_MCP_SERVERS = {
     },
     "memory": {
         "description": "Elias Memory — Knowledge Graph, Memories, Entities",
-        "url": "http://YOUR_CONTROLLER_IP:5555",
+        "url": "http://YOUR_INFERENCE_NODE_IP:5555",
         "default_active": True,
     },
     "ollama-sidekick": {
         "description": "Multi-model orchestration via local Ollama",
-        "url": "http://YOUR_CONTROLLER_IP:11434",
+        "url": "http://YOUR_INFERENCE_NODE_IP:11434",
         "default_active": True,
     },
     "network-agent": {

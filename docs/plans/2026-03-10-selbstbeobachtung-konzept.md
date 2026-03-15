@@ -1,7 +1,7 @@
 # Konzept: Selbstbeobachtung & Selbstreflexion
 
 **Datum:** 2026-03-10
-**Status:** Konzept (zur Freigabe durch the user)
+**Status:** Konzept (zur Freigabe durch den Operator)
 
 ---
 
@@ -17,7 +17,7 @@
 │  - Session-Retrospektive                              │
 │  - Feature-Brainstorming                              │
 │  - Laeuft: 1x taeglich (20:00 Cronjob)               │
-│  - Instanz: Claude via API ODER Nemotron auf Jetson   │
+│  - Instanz: Claude via API ODER Nemotron auf Inference Node   │
 └──────────────────────┬──────────────────────────────┘
                        │ liest
 ┌──────────────────────▼──────────────────────────────┐
@@ -28,7 +28,7 @@
 │  - Erkennt erfolgreiche Workarounds (>=3x → Regel)    │
 │  - Hash-Deduplizierung von Fehlern                    │
 │  - Laeuft: Alle 2h als Cronjob                        │
-│  - Instanz: lfm2:24b auf Zenbook (VORLAEUFIG)        │
+│  - Instanz: lfm2:24b auf npu-node (VORLAEUFIG)        │
 │  - SPAETER: Evaluierung bestimmt optimales Modell     │
 └──────────────────────┬──────────────────────────────┘
                        │ liest
@@ -56,9 +56,9 @@
 ### Was wird geloggt:
 | Aktion | action_type | Beispiel |
 |--------|-------------|----------|
-| Ollama Inference | `inference` | model=lfm2, device=jetson, 800ms, success |
+| Ollama Inference | `inference` | model=lfm2, device=inference-node, 800ms, success |
 | Memory schreiben | `memory_write` | table=memories, type=core, importance=1.0 |
-| Memory lesen | `memory_read` | query="the user's Regeln", results=3 |
+| Memory lesen | `memory_read` | query="the operator's Regeln", results=3 |
 | Tool-Aufruf | `tool_call` | tool=sidekick_research, 12s, success |
 | Netzwerk-Call | `network` | target=desktop, ssh, 200ms, success |
 | Fehler | `error` | E027: Desktop unreachable |
@@ -83,8 +83,8 @@ END;
 
 ## Schicht 2: Pattern-Detector (lfm2:24b vorlaeufig)
 
-**Instanz:** lfm2:24b auf Zenbook (schlauer, MoE nur 2B aktiv pro Token)
-**Fallback:** lfm2:24b auf Jetson oder Desktop
+**Instanz:** lfm2:24b auf npu-node (schlauer, MoE nur 2B aktiv pro Token)
+**Fallback:** lfm2:24b auf Inference Node oder Desktop
 **Frequenz:** Alle 2 Stunden via Cronjob
 **VORLAEUFIG** — Nach Model-Evaluierung (TODO T016) wird das optimale Modell bestimmt. Evtl. eigenes SFT-trainiertes 1.5B Modell (way2agi-observer) spaeter.
 
@@ -161,7 +161,7 @@ LETZTE SESSION-SCORE: {last_session_score}
 Aufgaben:
 1. Session-Retrospektive (was lief gut/schlecht?)
 2. Funktioniert die Selbstbeobachtung? (Meta-Check)
-3. 3 Feature-Ideen die ueber the user's Anweisungen hinausgehen
+3. 3 Feature-Ideen die ueber the operator's Anweisungen hinausgehen
 4. Empfehlung: Worauf sollte morgen der Fokus liegen?
 
 Antworte strukturiert.
@@ -174,13 +174,13 @@ Antworte strukturiert.
 | Aufgabe | Instanz | Geraet | Frequenz | Modell |
 |---------|---------|--------|----------|--------|
 | Action-Logging | Middleware (kein LLM) | ALLE | Echtzeit | - |
-| Pattern-Detection | Pattern-Detector | Zenbook | 2h | lfm2:24b (vorlaeufig) |
-| Fehler→TODO Auto | Pattern-Detector | Zenbook | 2h | lfm2:24b (AUTO) |
-| Workaround→Regel | Pattern-Detector | Zenbook | 2h | lfm2:24b (AUTO) |
+| Pattern-Detection | Pattern-Detector | npu-node | 2h | lfm2:24b (vorlaeufig) |
+| Fehler→TODO Auto | Pattern-Detector | npu-node | 2h | lfm2:24b (AUTO) |
+| Workaround→Regel | Pattern-Detector | npu-node | 2h | lfm2:24b (AUTO) |
 | Session-Retrospektive | Meta-Observer | Cloud API | 1x/Tag | Claude Opus (vorlaeufig) |
 | Feature-Brainstorming | Meta-Observer | Cloud API | 1x/Tag | Claude Opus (AUTO) |
 | Meta-Check | Meta-Observer | Cloud API | 1x/Tag | Claude Opus (AUTO) |
-| GoalGuard-Scan | GoalGuard Daemon | Jetson | 3x/Tag | Regelbasiert + LLM |
+| GoalGuard-Scan | GoalGuard Daemon | Inference Node | 3x/Tag | Regelbasiert + LLM |
 
 ---
 
@@ -209,13 +209,13 @@ Jede Aktion auf jedem Geraet
 
 ---
 
-## Entscheidungen (the user, 2026-03-10)
+## Entscheidungen (Operator, 2026-03-10)
 
 1. **Pattern-Detector:** lfm2:24b (vorlaeufig, schlauer). Nach Evaluierung optimales Modell.
 2. **Meta-Observer:** Claude Opus via API (vorlaeufig). Nach Evaluierung pruefen ob lokal moeglich.
 3. **Action-Logger:** Jede Aktion loggen (mehr Daten = besseres Training).
 4. **Frequenz Pattern-Detector:** Alle 2h.
-5. **Automatische Umsetzung:** JA. Pattern-Detector-Vorschlaege werden AUTOMATISCH umgesetzt. Ziel ist Selbststaendigkeit — kein manuelles Bestaetigen. the user greift nur ein wenn noetig (GoalGuard Regel: Nur abweichen wenn the user explizit darum bittet).
+5. **Automatische Umsetzung:** JA. Pattern-Detector-Vorschlaege werden AUTOMATISCH umgesetzt. Ziel ist Selbststaendigkeit — kein manuelles Bestaetigen. the operator greift nur ein wenn noetig (GoalGuard Regel: Nur abweichen wenn the operator explizit darum bittet).
 
 ## Automatisierungs-Kette (Selbststaendigkeit)
 
@@ -244,4 +244,4 @@ GoalGuard
     └── Prueft ALLES ──> AUTO: Fehlende Implementierungen starten
 ```
 
-**Kein Schritt erfordert the user's Eingreifen.** Das System beobachtet, erkennt, handelt — selbststaendig.
+**Kein Schritt erfordert the operator's Eingreifen.** Das System beobachtet, erkennt, handelt — selbststaendig.

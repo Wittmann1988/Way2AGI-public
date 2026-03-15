@@ -11,11 +11,11 @@ DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.json"
 
 # Compute Network Nodes
 NODES = {
-    "jetson": {
-        "name": "YOUR_CONTROLLER_DEVICE",
-        "ip": "YOUR_CONTROLLER_IP",
-        "ssh": "YOUR_CONTROLLER_USER@YOUR_CONTROLLER_IP",
-        "ssh_pass": "jetson",
+    "inference-node": {
+        "name": "Inference Node AGX Orin",
+        "ip": "YOUR_INFERENCE_NODE_IP",
+        "ssh": "YOUR_USER@YOUR_INFERENCE_NODE_IP",
+        "ssh_pass": "inference-node",
         "port": 8050,
         "ollama_port": 11434,
         "llama_port": 8080,
@@ -31,21 +31,21 @@ NODES = {
         ],
     },
     "desktop": {
-        "name": "Desktop YOUR_GPU",
-        "ip": "YOUR_DESKTOP_IP",
-        "ssh": "YOUR_SSH_USER@YOUR_DESKTOP_IP",
+        "name": "Desktop RTX 5090",
+        "ip": "YOUR_COMPUTE_NODE_IP",
+        "ssh": "YOUR_USER@YOUR_COMPUTE_NODE_IP",
         "port": 8100,
         "ollama_port": 11434,
         "role": "Heavy Compute, Training",
-        "gpu": "YOUR_GPU 32GB",
+        "gpu": "RTX 5090 32GB",
         "models": [
             "lfm2:24b", "step-3.5-flash", "qwen3.5:9b",
         ],
     },
-    "zenbook": {
-        "name": "Zenbook Laptop",
-        "ip": "YOUR_LAPTOP_IP",
-        "ssh": "erik@YOUR_LAPTOP_IP",
+    "npu-node": {
+        "name": "npu-node Laptop",
+        "ip": "YOUR_NPU_NODE_IP",
+        "ssh": "YOUR_USER@YOUR_NPU_NODE_IP",
         "port": 8150,
         "role": "NPU Node, Orchestration",
         "models": [
@@ -54,9 +54,9 @@ NODES = {
     },
     "s24": {
         "name": "S24 Tablet",
-        "ip": "YOUR_MOBILE_IP",
+        "ip": "YOUR_MOBILE_NODE_IP",
         "ssh_port": 8022,
-        "ssh": "u0_a401@YOUR_MOBILE_IP",
+        "ssh": "YOUR_USER@YOUR_MOBILE_NODE_IP",
         "port": 8200,
         "ollama_port": 11434,
         "role": "Light Node, Verification",
@@ -64,9 +64,9 @@ NODES = {
     },
     "s25": {
         "name": "S25 Ultra",
-        "ip": "YOUR_PHONE_IP",
+        "ip": "YOUR_TABLET_NODE_IP",
         "ssh_port": 8022,
-        "ssh": "u0_a401@YOUR_PHONE_IP",
+        "ssh": "YOUR_USER@YOUR_TABLET_NODE_IP",
         "port": 8200,
         "role": "Light Node",
         "models": ["qwen3-abliterated:8b"],
@@ -107,17 +107,17 @@ CLOUD_PROVIDERS = {
     },
 }
 
-# Jetson Daemon API endpoints
+# Inference Node Daemon API endpoints
 DAEMON_ENDPOINTS = {
-    "health": "http://YOUR_CONTROLLER_IP:8050/health",
-    "nodes": "http://YOUR_CONTROLLER_IP:8050/nodes",
-    "job": "http://YOUR_CONTROLLER_IP:8050/job",
-    "roundtable": "http://YOUR_CONTROLLER_IP:8050/roundtable",
+    "health": "http://YOUR_INFERENCE_NODE_IP:8050/health",
+    "nodes": "http://YOUR_INFERENCE_NODE_IP:8050/nodes",
+    "job": "http://YOUR_INFERENCE_NODE_IP:8050/job",
+    "roundtable": "http://YOUR_INFERENCE_NODE_IP:8050/roundtable",
 }
 
-MEMORY_INJECT_URL = "http://YOUR_CONTROLLER_IP:5555/memory/inject"
-MEMORY_QUERY_URL = "http://YOUR_CONTROLLER_IP:5555/memory/query"
-MEMORY_HEALTH_URL = "http://YOUR_CONTROLLER_IP:5555/health"
+MEMORY_INJECT_URL = "http://YOUR_INFERENCE_NODE_IP:5555/memory/inject"
+MEMORY_QUERY_URL = "http://YOUR_INFERENCE_NODE_IP:5555/memory/query"
+MEMORY_HEALTH_URL = "http://YOUR_INFERENCE_NODE_IP:5555/health"
 
 
 class Way2AGIConfig:
@@ -135,7 +135,7 @@ class Way2AGIConfig:
     def _defaults() -> dict[str, Any]:
         return {
             "version": "2.0.0",
-            "user_name": "the user",
+            "user_name": "operator",
             "language": "de",
             "provider": "anthropic",
             "model": "claude-sonnet-4-6",
@@ -155,7 +155,7 @@ class Way2AGIConfig:
                 },
                 "ollama": {
                     "api_key": "",
-                    "base_url": "http://YOUR_CONTROLLER_IP:11434/v1",
+                    "base_url": "http://YOUR_INFERENCE_NODE_IP:11434/v1",
                     "models": [],
                 },
                 "anthropic": {
@@ -181,7 +181,7 @@ class Way2AGIConfig:
             },
             "memory": {
                 "enabled": True,
-                "server_url": "http://YOUR_CONTROLLER_IP:5555",
+                "server_url": "http://YOUR_INFERENCE_NODE_IP:5555",
                 "auto_store": True,
                 "auto_recall": True,
                 "recall_top_k": 3,
@@ -193,7 +193,7 @@ class Way2AGIConfig:
                     "active": True,
                 },
                 "memory": {
-                    "url": "http://YOUR_CONTROLLER_IP:5555",
+                    "url": "http://YOUR_INFERENCE_NODE_IP:5555",
                     "active": True,
                 },
             },

@@ -14,9 +14,9 @@
 - Spezialisierte 2B Modelle erreichen ~90% der Performance von 7B Generalisten bei 3-5x weniger Kosten
 
 **Hardware:**
-- Jetson Nano (.21): lfm2:24b, smallthinker:1.8b, nemotron-3-nano:30b
-- Desktop YOUR_GPU (.129): lfm2:24b, step-3.5-flash, qwen3.5:9b, abliterated Modelle
-- Zenbook (.111): lfm2:24b, smallthinker:1.8b, qwen3:1.7b
+- Inference Node Nano (.21): lfm2:24b, smallthinker:1.8b, nemotron-3-nano:30b
+- Desktop RTX 5090 (.129): lfm2:24b, step-3.5-flash, qwen3.5:9b, abliterated Modelle
+- npu-node (.111): lfm2:24b, smallthinker:1.8b, qwen3:1.7b
 - S24 Tablet (.182): qwen3:1.7b (begrenzt)
 - Cloud: Gemini, Groq, OpenAI, OpenRouter
 
@@ -40,27 +40,27 @@ Aus allen Vorschlaegen destilliert, priorisiert nach unserem Way2AGI Use-Case:
 
 | # | Agent-Name | Aufgabe | Basis-Modell | Geraet | Prioritaet |
 |---|-----------|---------|-------------|--------|-----------|
-| 1 | **IntentRouter** | Intent-Klassifikation (Routing-Entscheidung) | qwen3:1.7b (SFT) | S24 Tablet / Zenbook | P0 - Kritisch |
-| 2 | **CodeGen** | Python/JS Code-Generierung | smallthinker:1.8b (SFT) | Zenbook (.111) | P0 - Kritisch |
+| 1 | **IntentRouter** | Intent-Klassifikation (Routing-Entscheidung) | qwen3:1.7b (SFT) | S24 Tablet / npu-node | P0 - Kritisch |
+| 2 | **CodeGen** | Python/JS Code-Generierung | smallthinker:1.8b (SFT) | npu-node (.111) | P0 - Kritisch |
 | 3 | **CodeReview** | Code-Review, Bug-Findung, Security-Scan | qwen3.5:9b / step-flash | Desktop RTX (.129) | P0 - Kritisch |
-| 4 | **Summarizer** | Text-Zusammenfassung (kurz + lang) | smallthinker:1.8b (SFT) | Jetson Nano (.21) | P1 - Wichtig |
-| 5 | **EntityExtractor** | NER: Namen, Orte, Konzepte extrahieren | smallthinker:1.8b (SFT) | Jetson Nano (.21) | P1 - Wichtig |
-| 6 | **FactChecker** | Fakten-Pruefung gegen Knowledge-Base | smallthinker:1.8b (SFT) | Jetson Nano (.21) | P1 - Wichtig |
-| 7 | **DataTransformer** | JSON/CSV/Strukturierte Daten-Konvertierung | qwen3:1.7b (SFT) | Zenbook (.111) | P1 - Wichtig |
+| 4 | **Summarizer** | Text-Zusammenfassung (kurz + lang) | smallthinker:1.8b (SFT) | Inference Node Nano (.21) | P1 - Wichtig |
+| 5 | **EntityExtractor** | NER: Namen, Orte, Konzepte extrahieren | smallthinker:1.8b (SFT) | Inference Node Nano (.21) | P1 - Wichtig |
+| 6 | **FactChecker** | Fakten-Pruefung gegen Knowledge-Base | smallthinker:1.8b (SFT) | Inference Node Nano (.21) | P1 - Wichtig |
+| 7 | **DataTransformer** | JSON/CSV/Strukturierte Daten-Konvertierung | qwen3:1.7b (SFT) | npu-node (.111) | P1 - Wichtig |
 | 8 | **GrammarPolisher** | Deutsche Grammatik/Rechtschreibung korrigieren | qwen3:1.7b (SFT) | S24 Tablet (.182) | P2 - Spaeter |
 | 9 | **SentimentAnalyzer** | Sentiment-Klassifikation (5 Klassen) | qwen3:1.7b (SFT) | S24 Tablet (.182) | P2 - Spaeter |
-| 10 | **TestGen** | Unit-Test-Generierung (pytest/Jest) | smallthinker:1.8b (SFT) | Jetson Nano (.21) | P2 - Spaeter |
+| 10 | **TestGen** | Unit-Test-Generierung (pytest/Jest) | smallthinker:1.8b (SFT) | Inference Node Nano (.21) | P2 - Spaeter |
 
 **Geraete-Verteilung:**
-- **Jetson Nano (.21):** 3 Agenten (Summarizer, EntityExtractor, FactChecker) - leichte, asynchrone Tasks
+- **Inference Node Nano (.21):** 3 Agenten (Summarizer, EntityExtractor, FactChecker) - leichte, asynchrone Tasks
 - **Desktop RTX (.129):** 1 Agent (CodeReview) + Training-Server + Fallback fuer komplexe Tasks
-- **Zenbook (.111):** 2 Agenten (CodeGen, DataTransformer) - mittlere Latenz-Anforderung
+- **npu-node (.111):** 2 Agenten (CodeGen, DataTransformer) - mittlere Latenz-Anforderung
 - **S24 Tablet (.182):** 2-3 Agenten (IntentRouter, GrammarPolisher, SentimentAnalyzer) - leichte Klassifikation
 - **Cloud:** Fallback fuer alle Agenten bei Ueberlastung oder Praezisions-Anforderung >95%
 
 ### 3. Training spezialisierter 1.5-2B Modelle (KONSENS)
 
-**Methode: LoRA/QLoRA auf YOUR_GPU (EINSTIMMIG)**
+**Methode: LoRA/QLoRA auf RTX 5090 (EINSTIMMIG)**
 
 | Aspekt | Empfehlung | Konsens-Staerke |
 |--------|-----------|----------------|
@@ -68,7 +68,7 @@ Aus allen Vorschlaegen destilliert, priorisiert nach unserem Way2AGI Use-Case:
 | **Technik** | LoRA (r=8-16, alpha=16-64) mit QLoRA (4-bit) | Einstimmig |
 | **Daten pro Agent** | 5k-50k hochwertige Beispiele | Konsens (Spanne variiert) |
 | **Daten-Quelle** | Knowledge Distillation von 7B+ Teacher-Modellen | Starker Konsens |
-| **Training-Dauer** | 2-4 Stunden pro Agent auf YOUR_GPU | Konsens |
+| **Training-Dauer** | 2-4 Stunden pro Agent auf RTX 5090 | Konsens |
 | **Quantisierung** | INT4/INT8 fuer Edge-Deployment | Einstimmig |
 | **Evaluation** | Task-spezifische Metriken + General-Intelligence Check (<5% Drop) | Starker Konsens |
 
@@ -77,7 +77,7 @@ Aus allen Vorschlaegen destilliert, priorisiert nach unserem Way2AGI Use-Case:
 1. Teacher-Modell (lfm2:24b oder qwen3.5:9b) generiert synthetische Daten
 2. Daten filtern: Nur Confidence >0.9 behalten
 3. Manuell kuratieren: Top-10k Beispiele pro Agent verifizieren
-4. LoRA Fine-Tuning auf YOUR_GPU (r=8, alpha=16, 3 Epochen, LR=2e-4)
+4. LoRA Fine-Tuning auf RTX 5090 (r=8, alpha=16, 3 Epochen, LR=2e-4)
 5. Quantization-Aware Training fuer Edge-Modelle
 6. Export: GGUF/ONNX/TensorRT je nach Ziel-Hardware
 7. Evaluation: Task-Accuracy + Latenz-Benchmark auf Ziel-Geraet
@@ -89,7 +89,7 @@ Aus allen Vorschlaegen destilliert, priorisiert nach unserem Way2AGI Use-Case:
 
 ```
 Routing-Entscheidungsbaum:
-1. IntentRouter klassifiziert Anfrage (auf S24/Zenbook, <50ms)
+1. IntentRouter klassifiziert Anfrage (auf S24/npu-node, <50ms)
 2. Task-Typ bestimmt Agent-Zuordnung (Keyword + Intent)
 3. Hardware-Check: Ist Ziel-Geraet verfuegbar und unter 85% Last?
 4. Latenz-Budget: Echtzeit (<100ms) = Edge, Tolerant (>500ms) = Cloud erlaubt
@@ -116,7 +116,7 @@ Routing-Entscheidungsbaum:
 
 #### Phase 2: SFT-Training + Erweiterung (Woche 3-4)
 - [ ] Synthetische Trainingsdaten generieren (Teacher: lfm2:24b)
-- [ ] LoRA-Training fuer IntentRouter, CodeGen, Summarizer auf YOUR_GPU
+- [ ] LoRA-Training fuer IntentRouter, CodeGen, Summarizer auf RTX 5090
 - [ ] Quantisierung fuer Edge-Deployment (INT4/INT8)
 - [ ] 3 P1-Agenten hinzufuegen: Summarizer, EntityExtractor, DataTransformer
 - [ ] Performance-Benchmarking: Latenz + Accuracy pro Agent
@@ -140,13 +140,13 @@ Routing-Entscheidungsbaum:
 
 ## Blinde Flecken / Warnungen (aus Step-Flash Analyse)
 
-1. **Orchestrierungs-Overhead:** Bei 10+ Agenten kann Routing 30% der Gesamt-Latenz ausmachen. Router auf staerkstem Edge-Geraet (Desktop/Zenbook) platzieren.
+1. **Orchestrierungs-Overhead:** Bei 10+ Agenten kann Routing 30% der Gesamt-Latenz ausmachen. Router auf staerkstem Edge-Geraet (Desktop/npu-node) platzieren.
 
 2. **Task-Grenzfaelle:** "Fasse diesen Code zusammen" - ist das Summarizer oder CodeReview? Starten mit KEINEM Merge, nur fuer manuell definierte Patterns hinzufuegen.
 
 3. **Datenqualitaet entscheidend:** Manuelle Kuratierung der Top-10k Beispiele pro Agent ist unerlaeasslich. Verunreinigte Daten ruinieren Spezialisierung.
 
-4. **Jetson Nano Limitierung:** ~1-2 Token/s fuer 2B Modelle. Nur fuer asynchrone, nicht-echtzeit Tasks geeignet. Haupt-Agenten auf Desktop/Cloud.
+4. **Inference Node Nano Limitierung:** ~1-2 Token/s fuer 2B Modelle. Nur fuer asynchrone, nicht-echtzeit Tasks geeignet. Haupt-Agenten auf Desktop/Cloud.
 
 5. **Monitoring von Anfang an:** Ohne zentrale Logs, Metriken und Tracing wird das System bei 10+ Agenten zur Blackbox. OpenTelemetry ab Tag 1.
 
@@ -169,7 +169,7 @@ Basierend auf dem Konsens empfehle ich:
 
 1. **Ansatz B (Task-Cluster)** statt reiner 1-Task-Agents - reduziert Orchestrierungs-Komplexitaet
 2. **Start mit 3 P0-Agenten** (IntentRouter, CodeGen, CodeReview) in Woche 1-2
-3. **LoRA-Training auf YOUR_GPU** mit Knowledge-Distillation von lfm2:24b als Teacher
+3. **LoRA-Training auf RTX 5090** mit Knowledge-Distillation von lfm2:24b als Teacher
 4. **Regelbasierter Router** als Start, ML-basiert erst wenn genuegend Traces gesammelt
 5. **10k hochwertige Beispiele** pro Agent (Qualitaet vor Quantitaet)
 6. **OpenTelemetry von Tag 1** - kein nachtraegliches Monitoring

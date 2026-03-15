@@ -51,7 +51,7 @@ class MemoryBrowserScreen(Screen):
         table.display = True
         self.query_one("#entity-log", RichLog).display = False
 
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -87,7 +87,7 @@ class MemoryBrowserScreen(Screen):
         entity_log.display = True
         entity_log.clear()
 
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -117,7 +117,7 @@ class MemoryBrowserScreen(Screen):
         entity_log.display = True
         entity_log.clear()
 
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -143,7 +143,7 @@ class MemoryBrowserScreen(Screen):
 
     async def _load_stats(self) -> None:
         stats = self.query_one("#memory-stats", Static)
-        server_url = self.config.get("memory.server_url", "http://YOUR_CONTROLLER_IP:5555")
+        server_url = self.config.get("memory.server_url", "http://YOUR_INFERENCE_NODE_IP:5555")
         try:
             import httpx
             async with httpx.AsyncClient(timeout=5.0) as client:

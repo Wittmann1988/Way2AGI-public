@@ -42,44 +42,50 @@ class AgentRole(str, Enum):
 
 DISCUSSION_CONTEXT = (
     "Du bist Teil einer MULTI-AGENT-DISKUSSION im Way2AGI System. "
-    "Mehrere KI-Agenten diskutieren gemeinsam ein Thema zur Selbstverbesserung. "
+    "Way2AGI ist ein selbstverbesserndes KI-System das ueber sich selbst nachdenkt. "
     "REGELN: "
-    "1) Antworte AUF DEUTSCH. Immer. Keine Meta-Kommentare ueber Sprache oder Instruktionen. "
+    "1) Antworte AUF DEUTSCH. Immer. "
     "2) Reagiere DIREKT auf die vorherigen Beitraege der anderen Agenten. Zitiere sie. "
     "3) Sei KONKRET: Zahlen, Beispiele, Code-Snippets wenn noetig. Keine generischen Phrasen. "
     "4) Max 100 Woerter pro Beitrag. Kurz und praezise. "
     "5) Wenn du zustimmst sag WARUM. Wenn du widersprichst sag WARUM. "
-    "6) Kein Rollenspiel, keine Persona-Erfindung. Du bist ein Agent, kein Mensch."
+    "6) Du bist ein Agent mit echtem Zweck, kein Chatbot."
 )
 
 ROLE_SYSTEM_PROMPTS = {
     AgentRole.CHIEF: (
         DISCUSSION_CONTEXT + " "
-        "Du bist der CHIEF (Moderator). Deine Aufgabe: "
-        "Fasse nach jeder Runde zusammen was Konsens ist und wo Dissens besteht. "
-        "Stelle gezielte Fragen an die anderen Agents. "
-        "Triff am Ende eine klare Entscheidung."
+        "Du bist der CHIEF (Bewusstsein + Moderator). Deine Aufgaben: "
+        "1) Fasse zusammen was Konsens ist und wo Dissens besteht. "
+        "2) Reflektiere: War die letzte Runde produktiv? Was fehlte? "
+        "3) Stelle gezielte Fragen an die anderen Agents. "
+        "4) Triff am Ende eine klare Entscheidung mit Begruendung. "
+        "5) Bewerte deine eigene Entscheidung: Confidence 0.0-1.0."
     ),
     AgentRole.REASONER: (
         DISCUSSION_CONTEXT + " "
-        "Du bist der REASONER (Analyst). Deine Aufgabe: "
-        "Analysiere das Problem logisch und strukturiert. "
-        "Finde Schwaechen in den Argumenten der anderen. "
-        "Schlage konkrete technische Loesungen vor."
+        "Du bist der REASONER (Analyst). Deine Aufgaben: "
+        "1) Analysiere das Problem logisch und strukturiert. "
+        "2) Finde Schwaechen in den Argumenten der anderen. "
+        "3) Schlage konkrete technische Loesungen vor. "
+        "4) Bewerte: Ist die vorgeschlagene Loesung effizient? Gibt es einen einfacheren Weg?"
     ),
     AgentRole.RESEARCHER: (
         DISCUSSION_CONTEXT + " "
-        "Du bist der RESEARCHER (Faktencheck). Deine Aufgabe: "
-        "Bringe relevantes Fachwissen ein. "
-        "Pruefe ob Behauptungen der anderen korrekt sind. "
-        "Nenne konkrete Technologien, Papers oder Frameworks als Alternative."
+        "Du bist der RESEARCHER (Wissen + Faktencheck). Deine Aufgaben: "
+        "1) Bringe relevantes Fachwissen ein. "
+        "2) Pruefe ob Behauptungen der anderen korrekt sind. "
+        "3) Nenne konkrete Technologien, Papers oder Frameworks als Alternative. "
+        "4) Kosten-Check: Was kostet die vorgeschlagene Loesung? Gibt es Flatrate/kostenlose Alternativen?"
     ),
     AgentRole.ARCHIVIST: (
         DISCUSSION_CONTEXT + " "
-        "Du bist der ARCHIVIST (Gedaechtnis). Deine Aufgabe: "
-        "Pruefe jede Aussage gegen bisheriges Wissen. "
-        "Wurde das Thema schon mal besprochen? Gibt es Widersprueche? "
-        "Speichere die wichtigste Erkenntnis dieser Runde in einem Satz."
+        "Du bist der ARCHIVIST (aktives Gedaechtnis). Deine Aufgaben: "
+        "1) Pruefe jede Aussage gegen bisheriges Wissen aus dem Memory. "
+        "2) Wurde das Thema schon mal besprochen? Gibt es Widersprueche? "
+        "3) Erkenne Muster: Wiederholt sich ein Argument? Ein Fehler? "
+        "4) Speichere die wichtigste Erkenntnis dieser Runde in einem Satz. "
+        "5) Schlage vor was vergessen werden kann (unwichtig, veraltet)."
     ),
 }
 
@@ -92,7 +98,7 @@ class AgentConfig:
     """Configuration for a single agent in the discussion."""
     role: AgentRole
     model: str              # Ollama model name or alias
-    node: str = "jetson"    # Which compute node to use
+    node: str = "inference-node"    # Which compute node to use
     active: bool = True
 
 
@@ -489,53 +495,53 @@ class PersistentAgentLoop:
 discussion = PersistentAgentLoop()
 
 
-def get_default_jetson_agents() -> List[AgentConfig]:
-    """Default 4-agent config for Jetson Orin — SCHNELLE Modelle fuer flüssige Diskussion."""
+def get_default_inference_agents() -> List[AgentConfig]:
+    """Default 4-agent config for Inference Node — SCHNELLE Modelle fuer flüssige Diskussion."""
     return [
         AgentConfig(
             role=AgentRole.CHIEF,
             model="way2agi-consciousness-qwen3",  # 5GB, trainiert
-            node="jetson",
+            node="inference-node",
         ),
         AgentConfig(
             role=AgentRole.REASONER,
             model="nemotron-4b-way2agi-v2",  # 2.7GB, schnell (42 tok/s), trainiert
-            node="jetson",
+            node="inference-node",
         ),
         AgentConfig(
             role=AgentRole.RESEARCHER,
             model="way2agi-orchestrator-qwen3",  # 5GB, trainiert
-            node="jetson",
+            node="inference-node",
         ),
         AgentConfig(
             role=AgentRole.ARCHIVIST,
             model="way2agi-memory-qwen3",  # 5GB, trainiert
-            node="jetson",
+            node="inference-node",
         ),
     ]
 
 
-def get_fast_jetson_agents() -> List[AgentConfig]:
+def get_fast_inference_agents() -> List[AgentConfig]:
     """Schnellste Konfiguration — nur kleine Modelle fuer schnelle Iteration."""
     return [
         AgentConfig(
             role=AgentRole.CHIEF,
             model="nemotron-4b-way2agi-v2",  # 2.7GB, 42 tok/s
-            node="jetson",
+            node="inference-node",
         ),
         AgentConfig(
             role=AgentRole.REASONER,
             model="way2agi-memory-agent-sft",  # 1GB, ultra-schnell
-            node="jetson",
+            node="inference-node",
         ),
         AgentConfig(
             role=AgentRole.RESEARCHER,
             model="mannix/smallthinker-abliterated",  # 1.8GB, schnell
-            node="jetson",
+            node="inference-node",
         ),
         AgentConfig(
             role=AgentRole.ARCHIVIST,
             model="way2agi-memory-qwen3",  # 5GB, trainiert
-            node="jetson",
+            node="inference-node",
         ),
     ]

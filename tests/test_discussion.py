@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quick test: 2-agent persistent discussion on Jetson."""
+"""Quick test: 2-agent persistent discussion on Inference Node."""
 import asyncio
 import json
 import urllib.request

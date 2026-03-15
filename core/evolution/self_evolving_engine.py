@@ -17,7 +17,7 @@ Was JETZT passiert:
 4. Code-Vorschlaege werden generiert und als TODO gespeichert
 5. Traces fuer Z6 Pipeline (SFT Training aus eigenen Entscheidungen)
 
-Cronjob: Taeglich 03:00 auf Jetson Controller
+Cronjob: Taeglich 03:00 auf Inference Node Controller
 """
 
 import json
@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 log = logging.getLogger("way2agi.evolution")
 
-DB_PATH = os.environ.get("WAY2AGI_DB", "/data/way2agi/memory/memory.db")
+DB_PATH = os.environ.get("WAY2AGI_DB", "/opt/way2agi/memory/memory.db")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:8150")
 
@@ -196,7 +196,7 @@ def analyze_paper_with_roundtable(paper: Dict[str, Any]) -> Dict[str, Any]:
 {title}
 
 Way2AGI ist ein verteiltes KI-System mit:
-- 4 Nodes (Jetson Orin 64GB, Desktop RTX5090, Laptop, S24)
+- 4 Nodes (Inference Node 64GB, Desktop RTX5090, Laptop, S24)
 - Persistent Multi-Agent Discussion (4 Agents)
 - Self-Improving Pipeline (Z6)
 - Six-Layer Memory System

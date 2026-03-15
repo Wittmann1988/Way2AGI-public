@@ -3,7 +3,7 @@
 # Usage: ssh desktop 'wsl -d Ubuntu-22.04 -- bash /mnt/c/temp_training/run_agent_train.sh orchestrator'
 
 AGENT=${1:-way2agi-orchestrator}
-export WAY2AGI_ROOT=/home/erik/Way2AGI
+export WAY2AGI_ROOT=/home/YOUR_USER/Way2AGI
 cd $WAY2AGI_ROOT
 
 echo "=== Starting training for $AGENT ==="

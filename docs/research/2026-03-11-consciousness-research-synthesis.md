@@ -89,7 +89,7 @@ Nur wenn Score > Threshold: Hypothese wird als "neu" eingestuft.
 1. **Messbarkeit** (KPIs für alles)
 2. **Kein Overkill** (start simple, skaliere bei Bedarf)
 3. **Wirkketten** (Output muss ins System fließen)
-4. **Hardware-aware** (Jetson-Limits respektieren)
+4. **Hardware-aware** (Inference Node-Limits respektieren)
 5. **Safeguards** (Confidence Gating, keine unkontrollierte Mutation)
 
 ## 8 Implementierte Mechanismen (in consciousness_agent.py)
@@ -110,4 +110,4 @@ Nur wenn Score > Threshold: Hypothese wird als "neu" eingestuft.
 - [ ] Experimentelle Validierung: Hypothese → Code → Test (#3)
 - [ ] Memory-gestützte Novelty Detection via ChromaDB (#4)
 - [ ] Training mit allen Traces (Consciousness + Memory + Orchestrator)
-- [ ] Merge zu einem Modell, GGUF, Deploy auf Jetson
+- [ ] Merge zu einem Modell, GGUF, Deploy auf Inference Node

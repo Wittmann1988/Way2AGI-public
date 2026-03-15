@@ -331,7 +331,7 @@ async def recent_patterns() -> list[Pattern]:
 async def consolidate() -> ConsolidationResult:
     """Consolidation: episodes -> lessons -> semantic/procedural.
 
-    Groups recent episodes, extracts lessons via LLM (Jetson or Desktop),
+    Groups recent episodes, extracts lessons via LLM (Inference Node or Desktop),
     and stores them as semantic memories with higher importance.
     """
     mem = _get_memory()
@@ -397,7 +397,7 @@ async def consolidate() -> ConsolidationResult:
 async def _extract_lesson(episodes_text: str) -> str | None:
     """Extract a lesson from a batch of episodes using an available LLM.
 
-    Tries: Jetson (local, free) -> Desktop daemon -> fallback heuristic.
+    Tries: Inference Node (local, free) -> Desktop daemon -> fallback heuristic.
     """
     import json
     import urllib.request
@@ -410,10 +410,10 @@ async def _extract_lesson(episodes_text: str) -> str | None:
         f"Episoden:\n{episodes_text}"
     )
 
-    # Try Jetson first (always-on, free)
+    # Try Inference Node first (always-on, free)
     endpoints = [
-        ("http://YOUR_CONTROLLER_IP:11434", "huihui_ai/qwen3-abliterated:8b"),
-        ("http://YOUR_DESKTOP_IP:11434", "qwen3.5:9b"),
+        ("http://YOUR_INFERENCE_NODE_IP:11434", "huihui_ai/qwen3-abliterated:8b"),
+        ("http://YOUR_COMPUTE_NODE_IP:11434", "qwen3.5:9b"),
     ]
 
     for base_url, model in endpoints:

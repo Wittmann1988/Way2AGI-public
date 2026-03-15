@@ -2,7 +2,7 @@
 """
 Micro-Orchestrator — Lokaler Entscheider pro Geraet
 =====================================================
-Jedes Geraet (Jetson, Desktop, Laptop, S24) bekommt einen eigenen
+Jedes Geraet (Inference Node, Desktop, Laptop, S24) bekommt einen eigenen
 Mini-Orchestrator der lokal entscheidet:
   - Welches Modell fuer den Task am besten ist
   - Ob der Task lokal ausfuehrbar ist
@@ -11,7 +11,7 @@ Mini-Orchestrator der lokal entscheidet:
 Der zentrale Orchestrator fragt die Geraete nur noch:
   "Kannst du diesen Task? Wie schnell? Welches Modell?"
 
-Inspiriert von Eriks Vision: Dezentrale Edge-Orchestrierung.
+Inspiriert von the operator's Vision: Dezentrale Edge-Orchestrierung.
 """
 
 import asyncio
@@ -116,14 +116,14 @@ class MicroOrchestrator:
 
     def _detect_vram_gb(self) -> float:
         """Erkennt verfuegbares VRAM (GPU) oder RAM (CPU-only)."""
-        # Jetson: Shared Memory = gesamter RAM
+        # Inference Node: Shared Memory = gesamter RAM
         try:
             with open("/proc/meminfo") as f:
                 for line in f:
                     if line.startswith("MemTotal"):
                         kb = int(line.split()[1])
                         total = round(kb / 1024 / 1024, 1)
-                        # Jetson 64GB: ~58GB nutzbar, Desktop RTX5090: 32GB VRAM
+                        # Inference Node 64GB: ~58GB nutzbar, Desktop RTX5090: 32GB VRAM
                         log.info("VRAM/RAM erkannt: %.1fGB (%s)", total, self.device_name)
                         return total
         except Exception:

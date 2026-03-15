@@ -10,7 +10,7 @@ Der Agent-Loop:
 4. Nach jedem Schritt: Selbst-Evaluation ("Bin ich fertig?")
 5. Memory wird nach jedem Schritt aktualisiert (Arbeitsgedaechtnis)
 6. Erst wenn ALLE Schritte erfolgreich → Task als done markieren
-7. Bei Blockade → Task als blocked markieren + the user informieren
+7. Bei Blockade → Task als blocked markieren + the operator informieren
 
 Regel R012: Effizienz-Verbesserungen zuerst.
 """
@@ -28,12 +28,22 @@ try:
 except ImportError:
     # Standalone-Ausfuehrung
     import sys as _sys
-    _sys.path.insert(0, "/data/way2agi/orchestrator")
+    _sys.path.insert(0, "/opt/way2agi/orchestrator")
     from src.system_prompts import get_prompt
 
 log = logging.getLogger("agent-loop")
 
-DB_PATH = "/data/way2agi/memory/memory.db"
+# Shortcuts fuer kompakte Logs
+try:
+    import sys as _sys_al
+    _sys_al.path.insert(0, "/opt/way2agi/Way2AGI")
+    from core.agent_language import shortcut_task, shortcut_node_status
+    _SC_ENABLED = True
+except ImportError:
+    _SC_ENABLED = False
+
+DB_PATH = "/opt/way2agi/memory/db/elias_memory.db"
+_DB_FALLBACK = "/opt/way2agi/memory/memory.db"
 
 # Maximale Iterationen pro Task (Sicherheit gegen Endlosschleifen)
 MAX_ITERATIONS = 20
@@ -41,23 +51,86 @@ MAX_ITERATIONS = 20
 MAX_TASK_TIME = 1800  # 30 Minuten
 
 
+
+
+def ensure_schema(db):
+    """Prueft und ergaenzt fehlende Spalten in allen Tabellen.
+    Prevention: Kein Agent-Loop-Crash mehr wegen fehlender Columns.
+    Wird bei JEDEM Start ausgefuehrt."""
+    REQUIRED_COLUMNS = {
+        "memories": {
+            "access_count": "INTEGER DEFAULT 0",
+            "namespace": "TEXT",
+            "scope": "TEXT",
+            "valence": "REAL",
+            "salience": "REAL",
+            "embedding": "BLOB",
+        },
+        "todos": {
+            "assigned_to": "TEXT",
+            "completed_at": "TEXT",
+            "implementation": "TEXT",
+        },
+        "action_log": {
+            "model_used": "TEXT",
+            "device": "TEXT",
+        },
+    }
+    for table, columns in REQUIRED_COLUMNS.items():
+        try:
+            existing = {r[1] for r in db.execute("PRAGMA table_info(%s)" % table).fetchall()}
+        except Exception:
+            continue
+        for col_name, col_type in columns.items():
+            if col_name not in existing:
+                try:
+                    db.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, col_name, col_type))
+                    log.info("ensure_schema: %s.%s hinzugefuegt", table, col_name)
+                except Exception as e:
+                    log.warning("ensure_schema: %s.%s fehlgeschlagen: %s", table, col_name, e)
+    db.commit()
+    log.info("ensure_schema: Schema-Pruefung abgeschlossen")
+
+
 class AgentLoop:
     """Autonomer Agent der Tasks zu Ende bringt."""
 
-    def __init__(self, ollama_endpoints=None, llama_cpp_endpoints=None, default_model="nemotron-3-nano:30b"):
+    def __init__(self, ollama_endpoints=None, llama_cpp_endpoints=None, default_model="lfm2:24b"):
         """
-        ollama_endpoints: Dict von {name: url} z.B. {"jetson": "http://localhost:11434", ...}
-        llama_cpp_endpoints: Dict von {name: url} z.B. {"jetson": "http://localhost:8080", ...}
+        ollama_endpoints: Dict von {name: url} z.B. {"inference-node": "http://localhost:11434", ...}
+        llama_cpp_endpoints: Dict von {name: url} z.B. {"inference-node": "http://localhost:8080", ...}
         """
-        self.ollama_endpoints = ollama_endpoints or {"jetson": "http://localhost:11434"}
+        self.ollama_endpoints = ollama_endpoints or {"primary-node": "http://localhost:11434"}
         self.llama_cpp_endpoints = llama_cpp_endpoints or {}
         self.default_model = default_model
         self.db = sqlite3.connect(DB_PATH)
+        self.db.execute("PRAGMA journal_mode=WAL;")
+        self.db.execute("PRAGMA busy_timeout = 5000;")
         self.db.row_factory = sqlite3.Row
+        ensure_schema(self.db)
 
     def call_model(self, prompt, model=None, system=None, endpoint=None, timeout=120):
-        """Ruft ein Modell auf — versucht llama.cpp zuerst (parallel), dann Ollama."""
+        """Ruft ein Modell auf — Orchestrator zuerst, dann llama.cpp, dann Ollama."""
         model = model or self.default_model
+
+        # 0. Versuche Orchestrator (routet an Cloud/Desktop/Groq — 1-13s statt 20-80s)
+        try:
+            import requests
+            payload = {"task": prompt, "priority": 1}
+            if system:
+                payload["task"] = "[System: " + system[:500] + "] " + prompt
+            resp = requests.post("http://localhost:8150/v1/orchestrate", json=payload, timeout=60)
+            if resp.status_code == 200:
+                data = resp.json()
+                result = data.get("result", "")
+                if result and len(result.strip()) > 10:
+                    routing = data.get("routing", {})
+                    log.info("  \u2192 Orchestrator: %s (%d chars)", routing.get("model", "?"), len(result))
+                    return result, "orchestrator"
+                else:
+                    log.warning("Orchestrator Antwort zu kurz/leer: %s", result[:200] if result else "LEER")
+        except Exception as e:
+            log.warning("Orchestrator nicht verfuegbar: %s", e)
 
         # 1. Versuche llama.cpp (OpenAI-kompatibel, parallel)
         llama_endpoints = [endpoint] if endpoint else list(self.llama_cpp_endpoints.values())
@@ -158,7 +231,7 @@ class AgentLoop:
             "INSERT INTO action_log (action_type, module, model_used, device, "
             "input_summary, output_summary, success) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("agent_loop_step", "agent_loop", self.default_model, "jetson",
+            ("agent_loop_step", "agent_loop", self.default_model, "inference-node",
              "Task %s Schritt %d: %s" % (task_id, step_num, action[:200]),
              (result or "")[:500], 1 if success else 0)
         )
@@ -261,7 +334,7 @@ class AgentLoop:
         Fuehrt einen Task autonom bis zur Fertigstellung aus.
         Gibt zurueck: {"status": "done"|"blocked"|"timeout", "steps_completed": N, "result": "..."}
         """
-        log.info("=== AGENT-LOOP START: %s ===", task_id)
+        log.info("+T:%s", task_id)
         t0 = time.time()
 
         # Task auf in_progress setzen
@@ -276,7 +349,7 @@ class AgentLoop:
 
         # Schritte planen
         steps = self.plan_steps(task_id, context)
-        log.info("Task %s: %d Schritte geplant", task_id, len(steps))
+        log.info("+T:%s|%dS", task_id, len(steps))
         self.save_step(task_id, 0, "Planung: %d Schritte" % len(steps), json.dumps(steps, ensure_ascii=False)[:500])
 
         work_log = []
@@ -285,7 +358,7 @@ class AgentLoop:
         while iteration < MAX_ITERATIONS:
             elapsed = time.time() - t0
             if elapsed > MAX_TASK_TIME:
-                log.warning("Task %s: Timeout nach %.0fs", task_id, elapsed)
+                log.warning("XT:%s|TO:%.0fs", task_id, elapsed)
                 self.save_step(task_id, iteration, "TIMEOUT", "Max Zeit ueberschritten", success=False)
                 self.db.execute("UPDATE todos SET status='blocked' WHERE id=?", (task_id,))
                 self.db.commit()
@@ -299,7 +372,7 @@ class AgentLoop:
                 # → Neuen Schritt generieren basierend auf Evaluation
                 current_step = {"step": iteration + 1, "action": work_log[-1] if work_log else "Weiter arbeiten"}
 
-            log.info("Task %s Schritt %d: %s", task_id, iteration + 1, current_step.get("action", "")[:80])
+            log.info("S%d:%s|%s", iteration + 1, task_id, current_step.get("action", "")[:40])
 
             try:
                 result = self.execute_step(task_id, current_step, context)
@@ -312,7 +385,7 @@ class AgentLoop:
                 context += "\n\nSchritt %d Ergebnis: %s" % (iteration + 1, result[:500])
 
             except Exception as e:
-                log.error("Task %s Schritt %d fehlgeschlagen: %s", task_id, iteration + 1, e)
+                log.error("XS%d:%s|%s", iteration + 1, task_id, str(e)[:60])
                 work_log.append("Schritt %d FEHLER: %s" % (iteration + 1, e))
                 self.save_step(task_id, iteration + 1, current_step.get("action", ""), str(e), success=False)
 
@@ -322,7 +395,7 @@ class AgentLoop:
             eval_result = self.evaluate_completion(task_id, context, "\n".join(work_log[-5:]))
 
             if eval_result.get("done"):
-                log.info("Task %s FERTIG nach %d Schritten (%.0fs)", task_id, iteration, time.time() - t0)
+                log.info("VT:%s:%dS:%.0fs", task_id, iteration, time.time() - t0)
                 self.db.execute(
                     "UPDATE todos SET status='done', completed_at=datetime('now') WHERE id=?",
                     (task_id,)
@@ -353,10 +426,10 @@ class AgentLoop:
             next_step = eval_result.get("next_step")
             if next_step and iteration >= len(steps):
                 steps.append({"step": iteration + 1, "action": next_step})
-                log.info("Task %s: Neuer Schritt hinzugefuegt: %s", task_id, next_step[:80])
+                log.info("S%d:%s|+", iteration + 1, task_id)
 
         # Max Iterationen erreicht
-        log.warning("Task %s: Max Iterationen (%d) erreicht", task_id, MAX_ITERATIONS)
+        log.warning("XT:%s|MAX:%d", task_id, MAX_ITERATIONS)
         self.db.execute("UPDATE todos SET status='blocked' WHERE id=?", (task_id,))
         self.db.commit()
         return {"status": "blocked", "steps_completed": iteration, "result": "\n".join(work_log[-3:])}
@@ -401,12 +474,12 @@ class AgentLoopDaemon:
 
     def run_forever(self):
         """Endlosschleife: Pruefe auf offene TODOs, arbeite sie ab."""
-        log.info("Agent-Loop Daemon gestartet (Check alle %ds)", self.check_interval)
+        log.info("+AL|%ds", self.check_interval)
         while True:
             try:
                 result = self.loop.run_next_open_todo()
                 if result["status"] == "idle":
-                    log.info("Keine offenen TODOs — warte %ds", self.check_interval)
+                    log.info("AL:idle|%ds", self.check_interval)
                     time.sleep(self.check_interval)
                 else:
                     log.info("Task-Ergebnis: %s", result["status"])
@@ -424,20 +497,22 @@ def main():
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler("/data/way2agi/memory/logs/agent_loop.log", mode="a"),
+            logging.FileHandler("/opt/way2agi/memory/logs/agent_loop.log", mode="a"),
             logging.StreamHandler(sys.stdout),
         ],
     )
 
     ollama_eps = {
-        "jetson": "http://localhost:11434",
-        "desktop": "http://YOUR_DESKTOP_IP:11434",
-        "zenbook": "http://YOUR_LAPTOP_IP:11434",
+        "primary-node": "http://localhost:11434",
+        "inference-node": "http://YOUR_INFERENCE_NODE_IP:8080",
+        "desktop": "http://YOUR_COMPUTE_NODE_IP:11434",
+        "npu-node": "http://YOUR_NPU_NODE_IP:11434",
     }
     llama_cpp_eps = {
-        "jetson": "http://localhost:8080",
-        "desktop": "http://YOUR_DESKTOP_IP:8080",
-        "zenbook": "http://YOUR_LAPTOP_IP:8080",
+        "primary-node": "http://localhost:8080",
+        "inference-node": "http://YOUR_INFERENCE_NODE_IP:8080",
+        "desktop": "http://YOUR_COMPUTE_NODE_IP:8080",
+        "npu-node": "http://YOUR_NPU_NODE_IP:8080",
     }
 
     if "--daemon" in sys.argv:

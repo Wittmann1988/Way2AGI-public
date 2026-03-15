@@ -1,5 +1,5 @@
 """
-Agent-spezifisches SFT Training auf Desktop WSL2 (YOUR_GPU).
+Agent-spezifisches SFT Training auf Desktop WSL2 (RTX 5090).
 
 Trainiert einzelne Agents (orchestrator, memory, consciousness) auf ihren
 spezialisierten Traces, bevor die Faehigkeiten ins Haupt-Elias-Modell fliessen.

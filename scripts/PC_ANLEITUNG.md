@@ -3,7 +3,7 @@
 ## Kontext
 
 Dies ist das Way2AGI Projekt (GitHub: YOUR_GITHUB_USER/Way2AGI).
-the user entwickelt ein selbstverbesserndes AI-System.
+The operator entwickelt ein selbstverbesserndes AI-System.
 Training-Daten (129 SFT + 15 DPO Beispiele) sind bereits auf HuggingFace.
 
 ## Schnellstart

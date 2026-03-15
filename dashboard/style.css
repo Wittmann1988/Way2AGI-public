@@ -13,9 +13,9 @@
   --accent-glow: rgba(124, 92, 255, 0.3);
 
   /* Node Colors */
-  --node-jetson: #22c55e;
+  --node-inference-node: #22c55e;
   --node-desktop: #3b82f6;
-  --node-zenbook: #f59e0b;
+  --node-npu-node: #f59e0b;
   --node-s24: #a855f7;
 
   --radius: 12px;
@@ -75,7 +75,7 @@ body {
   background: #ef4444;
   transition: background 0.3s;
 }
-.status-dot.connected { background: var(--node-jetson); box-shadow: 0 0 6px var(--node-jetson); }
+.status-dot.connected { background: var(--node-inference-node); box-shadow: 0 0 6px var(--node-inference-node); }
 .separator { color: var(--border); }
 
 /* Main Layout */
@@ -269,9 +269,9 @@ body {
   top: 0; left: 0; right: 0;
   height: 3px;
 }
-.node-card.jetson::before { background: var(--node-jetson); }
+.node-card.inference-node::before { background: var(--node-inference-node); }
 .node-card.desktop::before { background: var(--node-desktop); }
-.node-card.zenbook::before { background: var(--node-zenbook); }
+.node-card.npu-node::before { background: var(--node-npu-node); }
 .node-card.s24::before { background: var(--node-s24); }
 
 .node-card.online { border-color: rgba(255,255,255,0.08); }
@@ -296,7 +296,7 @@ body {
   text-transform: uppercase;
   margin-top: 8px;
 }
-.node-status-badge.online { background: rgba(34,197,94,0.15); color: var(--node-jetson); }
+.node-status-badge.online { background: rgba(34,197,94,0.15); color: var(--node-inference-node); }
 .node-status-badge.offline { background: rgba(239,68,68,0.15); color: #ef4444; }
 
 .node-models {
@@ -317,9 +317,9 @@ body {
   border-radius: 2px;
   transition: width 0.5s ease;
 }
-.node-card.jetson .node-load-fill { background: var(--node-jetson); }
+.node-card.inference-node .node-load-fill { background: var(--node-inference-node); }
 .node-card.desktop .node-load-fill { background: var(--node-desktop); }
-.node-card.zenbook .node-load-fill { background: var(--node-zenbook); }
+.node-card.npu-node .node-load-fill { background: var(--node-npu-node); }
 .node-card.s24 .node-load-fill { background: var(--node-s24); }
 
 /* Chart Container */
@@ -372,9 +372,9 @@ body {
   font-weight: 600;
   flex-shrink: 0;
 }
-.task-node.jetson { background: rgba(34,197,94,0.15); color: var(--node-jetson); }
+.task-node.inference-node { background: rgba(34,197,94,0.15); color: var(--node-inference-node); }
 .task-node.desktop { background: rgba(59,130,246,0.15); color: var(--node-desktop); }
-.task-node.zenbook { background: rgba(245,158,11,0.15); color: var(--node-zenbook); }
+.task-node.npu-node { background: rgba(245,158,11,0.15); color: var(--node-npu-node); }
 .task-node.s24 { background: rgba(168,85,247,0.15); color: var(--node-s24); }
 .task-node.cloud { background: rgba(124,92,255,0.15); color: var(--accent); }
 

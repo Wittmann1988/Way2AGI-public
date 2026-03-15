@@ -109,7 +109,7 @@ export class OnboardingWizard {
 
   private async step2_identity(): Promise<void> {
     this.print('=== Step 2/6: Identity ===\n');
-    this.config.userName = await this.ask('Your name', 'the user');
+    this.config.userName = await this.ask('Your name', 'operator');
     this.config.language = await this.ask('Language (de/en)', 'de');
   }
 

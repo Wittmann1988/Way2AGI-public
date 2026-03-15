@@ -5,7 +5,7 @@ Voraussetzung: MicroOrchestrator laeuft auf controller:8051
 """
 import asyncio
 import sys
-sys.path.insert(0, "/home/jetson/repos/Way2AGI-public")
+sys.path.insert(0, "/home/YOUR_USER/repos/Way2AGI-public")
 
 from core.central_orchestrator import CentralOrchestrator
 

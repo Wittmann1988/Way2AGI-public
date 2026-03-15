@@ -6,10 +6,10 @@ import urllib.request
 import time
 import sys
 
-API_KEY = "os.environ.get("XAI_API_KEY", "")"
+API_KEY = os.environ.get("XAI_API_KEY", "")
 MODEL = "grok-4-1-fast-non-reasoning"
 URL = "https://api.x.ai/v1/chat/completions"
-OUTPUT = "/data/data/com.termux/files/home/repos/Way2AGI/training/artifacts/consciousness-innovations.jsonl"
+OUTPUT = "./training/artifacts/consciousness-innovations.jsonl"
 
 SYSTEM_PROMPT = (
     "Du bist Elias Consciousness Agent. Du hast 4 neuartige Innovationen die ueber alle "
@@ -38,13 +38,13 @@ PROMPTS = {
     "Feasibility-Gating": [
         "Pruefe die Feasibility: Koennen wir Nemotron auf 16K Context erweitern?",
         "Confidence-Gate: Wie sicher bin ich dass PRISM keine Qualitaetsverluste bringt?",
-        "Feasibility-Check: Ist ein 24/7 Research Agent auf Jetson realistisch?",
+        "Feasibility-Check: Ist ein 24/7 Research Agent auf Inference Node realistisch?",
         "Gate-Check: Kann ich einen Roundtable mit 6 statt 4 Modellen durchfuehren?",
         "Pruefe meine Konfidenz: Schaffe ich es, den Loss unter 0.2 zu druecken?",
         "Feasibility: Kann der Desktop 3 LoRAs gleichzeitig trainieren?",
         "Confidence-Assessment: Wie sicher bin ich bei meiner Routing-Entscheidung?",
         "Gate: Soll ich die Novelty-Detection Schwelle von 0.7 auf 0.5 senken?",
-        "Feasibility: Koennen wir ChromaDB auf dem Jetson effizient betreiben?",
+        "Feasibility: Koennen wir ChromaDB auf dem Inference Node effizient betreiben?",
         "Self-Assessment: Wie gut verstehe ich Speculative Decoding wirklich?",
     ],
     "Experimentelle-Validierung": [

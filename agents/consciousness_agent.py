@@ -12,7 +12,7 @@ Mechanismen:
 8. Goal Generation: Eigene Verbesserungsziele
 
 Usage:
-  python -m agents.consciousness_agent --mode full --db /data/way2agi/memory/memory.db
+  python -m agents.consciousness_agent --mode full --db /opt/way2agi/memory/memory.db
   python -m agents.consciousness_agent --mode analyze  # Nur Analyse
   python -m agents.consciousness_agent --mode research  # Nur Forschung
   python -m agents.consciousness_agent --mode improve   # Nur SVT
@@ -38,7 +38,7 @@ from typing import Any, Optional
 # Logging
 # ---------------------------------------------------------------------------
 
-LOG_DIR = os.environ.get("CONSCIOUSNESS_LOG_DIR", "/data/way2agi/memory/logs")
+LOG_DIR = os.environ.get("CONSCIOUSNESS_LOG_DIR", "/opt/way2agi/memory/logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 log = logging.getLogger("consciousness-agent")
@@ -47,21 +47,21 @@ log = logging.getLogger("consciousness-agent")
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_DB = "/data/way2agi/memory/memory.db"
+DEFAULT_DB = "/opt/way2agi/memory/memory.db"
 SCHEMA_PATH = os.path.join(
     os.path.dirname(__file__), "..", "training", "src", "consciousness_schema.sql"
 )
 
-# LLM endpoints (same order as agent_loop.py — Jetson first, Desktop second)
+# LLM endpoints (same order as agent_loop.py — Inference Node first, Desktop second)
 OLLAMA_ENDPOINTS = [
-    ("http://YOUR_CONTROLLER_IP:11434", "huihui_ai/qwen3-abliterated:8b"),
-    ("http://YOUR_DESKTOP_IP:11434", "qwen3.5:9b"),
+    ("http://YOUR_INFERENCE_NODE_IP:11434", "huihui_ai/qwen3-abliterated:8b"),
+    ("http://YOUR_COMPUTE_NODE_IP:11434", "qwen3.5:9b"),
     ("http://localhost:11434", "huihui_ai/qwen3-abliterated:8b"),
 ]
 
 LLAMA_CPP_ENDPOINTS = [
-    ("http://YOUR_CONTROLLER_IP:8080", "nemotron-3-nano:30b"),
-    ("http://YOUR_DESKTOP_IP:8080", "lfm2:24b"),
+    ("http://YOUR_INFERENCE_NODE_IP:8080", "nemotron-3-nano:30b"),
+    ("http://YOUR_COMPUTE_NODE_IP:8080", "lfm2:24b"),
 ]
 
 # Thresholds
@@ -422,15 +422,21 @@ class ConsciousnessAgent:
 
         for pat in slow_patterns:
             fail_rate = (pat["failures"] / pat["total"]) if pat["total"] > 0 else 0
+            _module = pat['module'] or 'unknown'
+            _device = pat['device'] or 'unknown'
+            _model = pat['model_used'] or 'unknown'
+            _avg_ms = pat['avg_ms'] or 0
+            _failures = pat['failures'] or 0
+            _total = pat['total'] or 1
             observation = (
-                f"Modul {pat['module']} auf {pat['device']}/{pat['model_used']}: "
-                f"{pat['failures']}/{pat['total']} Fehler ({fail_rate:.0%}), "
-                f"avg {pat['avg_ms']:.0f}ms"
+                f"Modul {_module} auf {_device}/{_model}: "
+                f"{_failures}/{_total} Fehler ({fail_rate:.0%}), "
+                f"avg {_avg_ms:.0f}ms"
             )
 
             # Create an intention to fix this
             if fail_rate > 0.3:
-                intent_desc = f"Routing fuer {pat['module']} optimieren — weg von {pat['device']}/{pat['model_used']} (Fehlerrate {fail_rate:.0%})"
+                intent_desc = f"Routing fuer {_module} optimieren — weg von {_device}/{_model} (Fehlerrate {fail_rate:.0%})"
                 self._create_intention(intent_desc, priority=0.7 + fail_rate * 0.2, linked_goal="routing_optimization")
 
             wirkkette = (
@@ -2006,7 +2012,7 @@ Modes:
 
 Examples:
   python -m agents.consciousness_agent --mode full
-  python -m agents.consciousness_agent --mode analyze --db /data/way2agi/memory/memory.db
+  python -m agents.consciousness_agent --mode analyze --db /opt/way2agi/memory/memory.db
   python -m agents.consciousness_agent --mode research --verbose
 """,
     )

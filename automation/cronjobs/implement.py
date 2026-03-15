@@ -13,8 +13,9 @@ import logging
 import os
 import sys
 
-DB_PATH = '/data/way2agi/memory/memory.db'
-LOG_PATH = '/data/way2agi/memory/logs/implement.log'
+DB_PATH = '/opt/way2agi/memory/db/elias_memory.db'
+_DB_FALLBACKS = ['/opt/way2agi/memory/memory.db']
+LOG_PATH = '/opt/way2agi/memory/logs/implement.log'
 
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 logging.basicConfig(
@@ -24,14 +25,22 @@ logging.basicConfig(
 )
 log = logging.getLogger('implement')
 
+# Prevention: Fallback-Chain — schnellste zuerst, lokaler CPU-only Ollama zuletzt
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+FALLBACK_CHAIN = [
+    {'name': 'groq', 'type': 'groq', 'model': 'llama-3.3-70b-versatile'},
+    {'name': 'desktop', 'type': 'ollama', 'url': 'http://YOUR_COMPUTE_NODE_IP:11434', 'model': 'lfm2:24b'},
+    {'name': 'npu-node', 'type': 'ollama', 'url': 'http://YOUR_NPU_NODE_IP:11434', 'model': 'lfm2:latest'},
+    {'name': 'primary-node', 'type': 'ollama', 'url': 'http://localhost:11434', 'model': 'qwen3.5:0.6b'},
+]
 NODES = {
-    'jetson': ('http://localhost:11434', 'lfm2:24b'),
-    'zenbook': ('http://YOUR_LAPTOP_IP:11434', 'lfm2:latest'),
-    'desktop': ('http://YOUR_DESKTOP_IP:8100', 'lfm2:24b'),
+    'inference-node': ('http://localhost:11434', 'lfm2:24b'),
+    'npu-node': ('http://YOUR_NPU_NODE_IP:11434', 'lfm2:latest'),
+    'desktop': ('http://YOUR_COMPUTE_NODE_IP:11434', 'lfm2:24b'),
 }
 
 
-def ollama_generate(url, model, prompt, system='', timeout=180):
+def ollama_generate(url, model, prompt, system='', timeout=300):
     try:
         payload = json.dumps({
             'model': model, 'prompt': prompt, 'system': system,
@@ -58,7 +67,7 @@ def verify_on_s24(code_description, timeout=60):
             'stream': False, 'options': {'temperature': 0.1, 'num_predict': 256}
         }).encode()
         req = urllib.request.Request(
-            'http://YOUR_MOBILE_IP:11434/api/generate',
+            'http://YOUR_MOBILE_NODE_IP:11434/api/generate',
             data=payload, headers={'Content-Type': 'application/json'}
         )
         resp = urllib.request.urlopen(req, timeout=timeout)
@@ -68,9 +77,82 @@ def verify_on_s24(code_description, timeout=60):
         return 'S24 nicht erreichbar'
 
 
+
+
+def groq_generate(prompt, system='', model='llama-3.3-70b-versatile', timeout=60):
+    """Nutzt Groq API (kostenlos, ~500 tok/s) als schnellsten Fallback."""
+    if not GROQ_API_KEY:
+        return None
+    try:
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        payload = json.dumps({
+            "model": model,
+            "messages": messages,
+            "max_tokens": 2048,
+            "temperature": 0.2,
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + GROQ_API_KEY,
+            },
+        )
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        data = json.loads(resp.read())
+        return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        log.warning("Groq Fehler: %s", e)
+        return None
+
+
+def generate_with_fallback(prompt, system='', timeout=300):
+    """Prevention: Fallback-Chain — Groq > Desktop > npu-node > Lokal.
+    Verhindert Connection-Reset durch zu langsame lokale Modelle."""
+    for node in FALLBACK_CHAIN:
+        name = node['name']
+        log.info("  Versuche %s...", name)
+        try:
+            if node['type'] == 'groq':
+                result = groq_generate(prompt, system, node['model'])
+                if result:
+                    log.info("  -> %s erfolgreich", name)
+                    return result, name
+            elif node['type'] == 'ollama':
+                result = ollama_generate(node['url'], node['model'], prompt, system, timeout=timeout)
+                if result:
+                    log.info("  -> %s erfolgreich", name)
+                    return result, name
+        except Exception as e:
+            log.warning("  %s fehlgeschlagen: %s", name, e)
+            continue
+    log.error("ALLE Nodes fehlgeschlagen!")
+    return None, None
+
+
+def get_robust_db():
+    """Prevention: Versucht alle bekannten DB-Pfade."""
+    for db_path in [DB_PATH] + _DB_FALLBACKS:
+        try:
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            conn = sqlite3.connect(db_path, timeout=30)
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if 'todos' in tables:
+                log.info("DB verbunden: %s", db_path)
+                return conn
+            conn.close()
+        except Exception as e:
+            log.warning("DB %s nicht nutzbar: %s", db_path, e)
+    raise RuntimeError("Keine nutzbare DB gefunden!")
+
+
 def main():
     log.info('=== Auto-Implementierung gestartet: %s ===', datetime.datetime.now().isoformat())
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_robust_db()
     conn.row_factory = sqlite3.Row
 
     # TODOs die in_progress sind (wurden von GoalGuard delegiert)
@@ -104,14 +186,16 @@ def main():
 
         system = 'Du bist ein Senior Python-Entwickler. Schreibe sauberen, getesteten Code. Keine externen Dependencies.'
 
-        # Bevorzuge Zenbook/Desktop fuer Code-Generierung
-        assigned = todo['assigned_to'] or 'jetson'
+        # Bevorzuge npu-node/Desktop fuer Code-Generierung
+        assigned = todo['assigned_to'] or 'inference-node'
         if assigned in NODES:
             url, model = NODES[assigned]
         else:
-            url, model = NODES['jetson']
+            url, model = NODES['inference-node']
 
-        code = ollama_generate(url, model, prompt, system)
+        # Nutze Fallback-Chain statt einzelnem Node (Prevention: Connection Reset)
+        code, used_node = generate_with_fallback(prompt, system, timeout=300)
+        log.info('Code generiert von: %s', used_node)
 
         if not code:
             log.warning('Keine Implementierung fuer %s erhalten', todo_id)

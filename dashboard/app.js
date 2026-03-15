@@ -11,9 +11,9 @@ const CHART_HISTORY = 60;    // 60 data points in chart
 
 // --- Node definitions ---
 const NODES = {
-  jetson:  { name: 'YOUR_CONTROLLER_DEVICE', ip: 'YOUR_CONTROLLER_IP',  color: '#22c55e', css: 'jetson' },
+  inference-node:  { name: 'YOUR_CONTROLLER_DEVICE', ip: 'YOUR_CONTROLLER_IP',  color: '#22c55e', css: 'inference-node' },
   desktop: { name: 'Desktop YOUR_GPU', ip: 'YOUR_DESKTOP_IP', color: '#3b82f6', css: 'desktop' },
-  zenbook: { name: 'Zenbook', ip: 'YOUR_LAPTOP_IP',          color: '#f59e0b', css: 'zenbook' },
+  npu-node: { name: 'npu-node', ip: 'YOUR_LAPTOP_IP',          color: '#f59e0b', css: 'npu-node' },
   s24:     { name: 'S24 Tablet', ip: 'YOUR_MOBILE_IP',       color: '#a855f7', css: 's24' },
 };
 
@@ -178,9 +178,9 @@ function updateNodeCard(key, info) {
 
 function normalizeNodeKey(key) {
   const lower = key.toLowerCase();
-  if (lower.includes('jetson')) return 'jetson';
+  if (lower.includes('inference-node')) return 'inference-node';
   if (lower.includes('desktop')) return 'desktop';
-  if (lower.includes('zenbook')) return 'zenbook';
+  if (lower.includes('npu-node')) return 'npu-node';
   if (lower.includes('s24') || lower.includes('tablet')) return 's24';
   // Direct match
   if (NODES[lower]) return lower;

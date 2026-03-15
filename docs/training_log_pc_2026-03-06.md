@@ -2,7 +2,7 @@
 
 ## System
 - Windows 11 Pro, Python 3.13
-- GPU: NVIDIA GeForce YOUR_GPU (32GB VRAM)
+- GPU: NVIDIA GeForce RTX 5090 (32GB VRAM)
 - CUDA 13.0, Driver 581.80
 - Repository: E:\claude-projects\Way2AGI
 
@@ -39,7 +39,7 @@ Script: `scripts/train_on_pc.py`
 Ergebnisse:
 - 129 SFT-Beispiele geladen, 116 Train / 13 Eval
 - 3 Epochen, 24 Steps
-- Trainingszeit: ~2 Minuten auf YOUR_GPU
+- Trainingszeit: ~2 Minuten auf RTX 5090
 - Train Loss: 1.261
 - Eval Loss: 1.159 -> 1.112 -> 1.102 (stetig verbessert)
 - Token Accuracy: ~70.3%
@@ -81,7 +81,7 @@ Dadurch wird nur die SFT-Datei geladen, nicht die DPO-Datei.
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128 --force-reinstall
 ```
-Danach wurde die YOUR_GPU korrekt erkannt. CUDA 12.8 Wheel ist 2.9 GB gross.
+Danach wurde die RTX 5090 korrekt erkannt. CUDA 12.8 Wheel ist 2.9 GB gross.
 
 ### ERROR 3: GGUF Konvertierung — tokenizer_config.json
 **Fehler:** `AttributeError: 'list' object has no attribute 'keys'` in transformers 5.3.0

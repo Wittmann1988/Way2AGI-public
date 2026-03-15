@@ -1,9 +1,9 @@
 """
-Way2AGI Orchestration Server v2.0
-==================================
+Way2AGI Orchestration Server
+=============================
 Das zentrale Gehirn — empfaengt Tasks, routet zu Modellen, koordiniert Agents.
-100 % depersonalisiert — Nutzt core/config.py
 
+Laeuft auf npu-node (YOUR_NPU_NODE_IP:8150).
 Start: uvicorn orchestrator.src.server:app --host 0.0.0.0 --port 8150
 """
 
@@ -14,23 +14,19 @@ import os
 import sqlite3
 import time
 import urllib.error
+import subprocess
 import urllib.request
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-
-try:
-    from core.config import config
-except ImportError:
-    config = None  # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # Optional imports — graceful degradation if modules don't exist yet
@@ -70,13 +66,6 @@ except ImportError:
     def get_prompt(role: str, extra_context: str = "") -> str:  # type: ignore[misc]
         return f"Du bist ein Agent im Way2AGI System. Rolle: {role}"
 
-try:
-    from core.central_orchestrator import CentralOrchestrator
-    _has_central_orch = True
-except ImportError:
-    CentralOrchestrator = None  # type: ignore[assignment,misc]
-    _has_central_orch = False
-
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -91,38 +80,38 @@ log = logging.getLogger("way2agi.server")
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DB_PATH = os.environ.get("WAY2AGI_DB", str(
-    config.PROJECT_ROOT / "memory" / "memory.db" if config else "/data/way2agi/memory/memory.db"
-))
+DB_PATH = os.environ.get("ELIAS_DB", "/opt/way2agi/memory/memory.db")
 
-
-def _build_nodes() -> dict[str, dict[str, Any]]:
-    """Build NODES dict dynamically from core/config.py or env vars."""
-    nodes: dict[str, dict[str, Any]] = {}
-    node_defs = [
-        ("controller", "CONTROLLER_IP", 8050, "Controller, Memory, Always-On"),
-        ("desktop", "DESKTOP_IP", 8100, "Heavy Compute, Training (WoL)"),
-        ("laptop", "LAPTOP_IP", 8150, "Orchestration, Agents"),
-        ("mobile", "MOBILE_IP", 8200, "Lite, Verification"),
-    ]
-    for name, env_key, port, role in node_defs:
-        ip = None
-        if config:
-            ip = getattr(config, env_key, None)
-        if not ip:
-            ip = os.environ.get(env_key)
-        if ip:
-            nodes[name] = {
-                "ip": ip,
-                "ollama": f"http://{ip}:11434",
-                "llama_cpp": f"http://{ip}:8080" if name != "mobile" else None,
-                "role": role,
-                "models": [],
-            }
-    return nodes
-
-
-NODES: dict[str, dict[str, Any]] = _build_nodes()
+NODES: dict[str, dict[str, Any]] = {
+    "primary-node": {
+        "ip": "127.0.0.1",
+        "ollama": "http://localhost:11434",
+        "llama_cpp": "http://localhost:8080",
+        "role": "Primary Node, Orchestrierung, lokale Inferenz",
+        "models": ["olmo-3:7b-think", "lfm2:24b", "qwen3.5:0.8b"],
+    },
+    "inference-node": {
+        "ip": "YOUR_INFERENCE_NODE_IP",
+        "ollama": None,
+        "llama_cpp": "http://YOUR_INFERENCE_NODE_IP:8080",
+        "role": "SpecDec Server (Nemotron-30B), kein Ollama",
+        "models": ["nemotron-30b-specdec"],
+    },
+    "desktop": {
+        "ip": "YOUR_COMPUTE_NODE_IP",
+        "ollama": "http://YOUR_COMPUTE_NODE_IP:11434",
+        "llama_cpp": None,
+        "role": "Heavy Compute, Training, RTX 5090",
+        "models": ["huihui_ai/qwen3-abliterated:8b", "lfm2:24b", "qwen3.5:9b", "deepseek-r1:7b"],
+    },
+    "s24": {
+        "ip": "YOUR_MOBILE_NODE_IP",
+        "ollama": "http://YOUR_MOBILE_NODE_IP:11434",
+        "llama_cpp": None,
+        "role": "Lite, Verifikation",
+        "models": ["qwen3:1.7b"],
+    },
+}
 
 # Runtime state
 node_status: dict[str, dict[str, Any]] = {}
@@ -130,7 +119,6 @@ active_tasks: dict[str, dict[str, Any]] = {}
 ws_clients: list[WebSocket] = []
 cost_tracker: dict[str, float] = {"total_usd": 0.0, "session_usd": 0.0}
 _startup_time: float = 0.0
-_central_orch: CentralOrchestrator | None = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +288,68 @@ def call_ollama(endpoint: str, prompt: str, model: str,
     return json.loads(resp.read())
 
 
+def call_ollama_cloud(prompt: str, model: str = "nemotron-3-super",
+                      system: str = "", timeout: int = 120) -> dict[str, Any]:
+    """Call Ollama Cloud API (Flatrate) via curl (urllib gets 403 from Cloudflare)."""
+    token = os.environ.get("OLLAMA_CLOUD_TOKEN") or os.environ.get("OLLAMA_API_KEY", "")
+    if not token:
+        raise RuntimeError("OLLAMA_CLOUD_TOKEN nicht gesetzt")
+    url = "https://api.ollama.com/api/chat"
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+    }
+    # MUSS curl nutzen — urllib wird von Cloudflare geblockt (403)!
+    proc = subprocess.run(
+        ["curl", "-s", "--max-time", str(timeout), url,
+         "-X", "POST",
+         "-H", "Content-Type: application/json",
+         "-H", f"Authorization: Bearer {token}",
+         "-d", json.dumps(payload)],
+        capture_output=True, text=True, timeout=timeout + 5,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl fehlgeschlagen: {proc.stderr[:200]}")
+    result = json.loads(proc.stdout)
+    if "error" in result:
+        raise RuntimeError(f"Ollama Cloud Error: {result['error']}")
+    return result
+
+
+def call_groq(prompt: str, model: str = "llama-3.3-70b-versatile",
+              system: str = "", timeout: int = 30) -> dict[str, Any]:
+    """Call Groq API (kostenlos, ~500 tok/s). Returns OpenAI-compatible JSON."""
+    api_key = os.environ.get("GROQ_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY nicht gesetzt")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": 2048,
+        "stream": False,
+    }
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+    )
+    resp = urllib.request.urlopen(req, timeout=timeout)
+    return json.loads(resp.read())
+
+
 def call_model_simple(
     prompt: str,
     model: str = "auto",
@@ -307,28 +357,54 @@ def call_model_simple(
     timeout: int = 120,
 ) -> tuple[str, str, str]:
     """
-    High-level model call. Tries llama.cpp first, then Ollama, across all
-    available nodes. Returns (response_text, model_used, node_name).
+    High-level model call. Routing-Prioritaet:
+    1. Ollama Cloud (Flatrate, GRATIS) — Reasoning/Chat
+    2. Desktop RTX 5090 (Ollama) — Code, Heavy Compute
+    3. Groq (kostenlos, schnell) — kurze Tasks
+    4. Inference Node llama.cpp — SpecDec
+    5. primary-node lokal — NUR letzter Fallback
+    Returns (response_text, model_used, node_name).
     """
     # Model -> node mapping
     model_map: dict[str, tuple[str, str]] = {
-        "nemotron": ("controller", "nemotron-3-nano:30b"),
-        "lfm2": ("controller", "lfm2:24b"),
-        "qwen3-abl": ("controller", "huihui_ai/qwen3-abliterated:8b"),
+        # === Ollama Cloud (Flatrate, GRATIS, HOECHSTE PRIO) ===
+        "cloud-nemotron": ("ollama-cloud", "nemotron-3-super"),
+        "cloud-qwen": ("ollama-cloud", "qwen3.5:397b"),
+        # === Desktop RTX 5090 (Ollama, Heavy Compute) ===
+        "qwen3-abl": ("desktop", "huihui_ai/qwen3-abliterated:8b"),
         "qwen3.5": ("desktop", "qwen3.5:9b"),
-        "qwen3.5-mini": ("controller", "qwen3.5:0.8b"),
         "deepseek-r1": ("desktop", "deepseek-r1:7b"),
-        "smallthinker": ("laptop", "mannix/smallthinker-abliterated:latest"),
-        "qwen3-lite": ("laptop", "qwen3:1.7b"),
+        "qwen3-abl-32b": ("desktop", "huihui_ai/qwen3-abliterated:32b"),
+        # === Groq (kostenlos, ~500 tok/s) ===
+        "groq-llama": ("groq", "llama-3.3-70b-versatile"),
+        # === Inference Node (NUR llama.cpp SpecDec, kein Ollama!) ===
+        "nemotron": ("inference-node", "nemotron-30b-specdec"),
+        # === primary-node lokal (NUR FALLBACK) ===
+        "olmo3": ("primary-node", "olmo-3:7b-think"),
+        "lfm2": ("primary-node", "lfm2:24b"),
+        "qwen3.5-lite": ("primary-node", "qwen3.5:0.8b"),
+        # === S24 ===
+        "qwen3-lite": ("s24", "qwen3:1.7b"),
     }
 
-    # Resolve "auto" — pick the best available node
+    # Resolve "auto" — Prioritaet: Cloud > Desktop > Groq > Inference Node > primary-node
     if model == "auto" or model == "cloud":
-        # Priority: jetson nemotron > desktop qwen3.5 > zenbook smallthinker > mini fallbacks
-        preferred = ["nemotron", "lfm2", "qwen3.5", "smallthinker", "qwen3.5-mini", "qwen3-lite"]
+        preferred = [
+            "cloud-nemotron",     # 1. Ollama Cloud Flatrate (GRATIS)
+            "cloud-qwen",         # 2. Ollama Cloud qwen3.5:397b
+            "qwen3.5",            # 3. Desktop RTX 5090
+            "qwen3-abl",          # 4. Desktop abliterated
+            "groq-llama",         # 5. Groq (kostenlos)
+            "nemotron",           # 6. Inference Node SpecDec
+            "olmo3",              # 7. primary-node (LETZTER Fallback)
+            "lfm2",               # 8. primary-node lfm2
+            "qwen3.5-lite",       # 9. primary-node lite
+        ]
     else:
         # Check if it's a known alias
-        preferred = [model] if model in model_map else ["nemotron", "lfm2"]
+        preferred = [model] if model in model_map else [
+            "cloud-nemotron", "qwen3.5", "groq-llama", "olmo3"
+        ]
 
     messages = []
     if system:
@@ -338,7 +414,39 @@ def call_model_simple(
     for alias in preferred:
         if alias not in model_map:
             continue
-        node_name, ollama_model = model_map[alias]
+        node_name, target_model = model_map[alias]
+
+        # --- Ollama Cloud ---
+        if node_name == "ollama-cloud":
+            try:
+                result = call_ollama_cloud(prompt, model=target_model,
+                                           system=system, timeout=min(timeout, 90))
+                # Ollama Cloud /api/chat returns message.content
+                text = result.get("message", {}).get("content", "")
+                if not text:
+                    text = result.get("response", "")
+                if text:
+                    log.info("Ollama Cloud (%s): OK", target_model)
+                    return text, target_model, "ollama-cloud"
+                else:
+                    log.debug("Ollama Cloud (%s): leere Antwort", target_model)
+            except Exception as e:
+                log.debug("Ollama Cloud (%s) fehlgeschlagen: %s", target_model, e)
+            continue
+
+        # --- Groq ---
+        if node_name == "groq":
+            try:
+                result = call_groq(prompt, model=target_model,
+                                   system=system, timeout=min(timeout, 30))
+                text = result["choices"][0]["message"]["content"]
+                log.info("Groq (%s): OK", target_model)
+                return text, target_model, "groq"
+            except Exception as e:
+                log.debug("Groq (%s) fehlgeschlagen: %s", target_model, e)
+            continue
+
+        # --- Local nodes (Ollama/llama.cpp) ---
         node_cfg = NODES.get(node_name, {})
 
         # Check if node is known to be down
@@ -350,11 +458,11 @@ def call_model_simple(
         llama_ep = node_cfg.get("llama_cpp")
         if llama_ep:
             try:
-                result = call_llama_cpp(llama_ep, messages, model=ollama_model,
-                                        timeout=timeout)
+                result = call_llama_cpp(llama_ep, messages, model=target_model,
+                                        timeout=min(timeout, 30))
                 text = result["choices"][0]["message"]["content"]
-                log.info("llama.cpp %s (%s): OK", node_name, ollama_model)
-                return text, ollama_model, node_name
+                log.info("llama.cpp %s (%s): OK", node_name, target_model)
+                return text, target_model, node_name
             except Exception as e:
                 log.debug("llama.cpp %s fehlgeschlagen: %s", node_name, e)
 
@@ -362,15 +470,15 @@ def call_model_simple(
         ollama_ep = node_cfg.get("ollama")
         if ollama_ep:
             try:
-                result = call_ollama(ollama_ep, prompt, model=ollama_model,
-                                     system=system, timeout=timeout)
+                result = call_ollama(ollama_ep, prompt, model=target_model,
+                                     system=system, timeout=min(timeout, 90))
                 text = result.get("response", "")
-                log.info("Ollama %s (%s): OK", node_name, ollama_model)
-                return text, ollama_model, node_name
+                log.info("Ollama %s (%s): OK", node_name, target_model)
+                return text, target_model, node_name
             except Exception as e:
                 log.debug("Ollama %s fehlgeschlagen: %s", node_name, e)
 
-    raise RuntimeError("Kein Modell-Endpoint erreichbar")
+    raise RuntimeError("Kein Modell-Endpoint erreichbar (Cloud, Desktop, Groq, Inference Node, primary-node alle fehlgeschlagen)")
 
 
 # ---------------------------------------------------------------------------
@@ -384,8 +492,7 @@ TASK_CATEGORIES = {
     "creative": ["schreib", "text", "story", "gedicht", "zusammenfass", "formulier",
                  "write", "creative", "prompt"],
     "memory": ["erinner", "speicher", "memory", "wann", "letzte", "frueher", "history"],
-    "system": ["status", "node", "health", "restart", "deploy", "update", "config",
-              "training", "train", "pipeline", "cron", "job"],
+    "system": ["status", "node", "health", "restart", "deploy", "update", "config"],
 }
 
 
@@ -416,20 +523,27 @@ def pick_strategy(task_type: str, explicit: str) -> str:
 
 
 def route_task(task_type: str) -> tuple[str, str]:
-    """Pick node + model based on task type. Returns (node_name, model_alias)."""
+    """Pick node + model based on task type. Returns (node_name, model_alias).
+    
+    ROUTING-PRIORITAET (2026-03-14):
+    1. Ollama Cloud (Flatrate, GRATIS) — Reasoning/Chat
+    2. Desktop RTX 5090 — Code, Heavy Compute
+    3. Groq — kurze Tasks
+    4. Inference Node llama.cpp — SpecDec
+    5. primary-node — NUR Fallback
+    """
     routing = {
-        "code": ("desktop", "qwen3.5"),
-        "reasoning": ("controller", "nemotron"),
-        "creative": ("controller", "lfm2"),
-        "memory": ("controller", "nemotron"),
-        "system": ("controller", "qwen3.5-mini"),
+        "code": ("desktop", "qwen3.5"),           # Desktop RTX 5090 fuer Code
+        "reasoning": ("ollama-cloud", "cloud-nemotron"),  # Cloud fuer Reasoning (GRATIS)
+        "creative": ("ollama-cloud", "cloud-nemotron"),   # Cloud fuer Creative (GRATIS)
+        "memory": ("groq", "groq-llama"),          # Groq fuer kurze Memory-Lookups
+        "system": ("groq", "groq-llama"),          # Groq fuer System-Tasks (schnell)
     }
-    node, model = routing.get(task_type, ("jetson", "nemotron"))
-    # Fallback if preferred node is down
+    node, model = routing.get(task_type, ("ollama-cloud", "cloud-nemotron"))
+    # Fallback if preferred node is down — Desktop > Groq > Cloud > Inference Node > primary-node
     ns = node_status.get(node, {})
-    if ns.get("status") == "down":
-        # Try jetson first, then any available
-        for fallback in ["controller", "desktop", "laptop", "mobile"]:
+    if ns.get("status") == "down" and node not in ("ollama-cloud", "groq"):
+        for fallback in ["desktop", "inference-node", "primary-node", "s24"]:
             if fallback != node and node_status.get(fallback, {}).get("status") != "down":
                 log.info("Routing-Fallback: %s -> %s", node, fallback)
                 return fallback, model
@@ -592,17 +706,12 @@ async def lifespan(app: FastAPI):
 
     # Banner
     log.info("=" * 60)
-    log.info("  Way2AGI Orchestration Server v2.0")
+    log.info("  Way2AGI Orchestration Server")
     log.info("  Port: 8150 | DB: %s", DB_PATH)
-    if config:
-        log.info("  User Prefix: %s", config.USER_MODEL_PREFIX)
-        log.info("  Consciousness: %s", "AKTIV" if config.ENABLE_CONSCIOUSNESS else "AUS")
-        log.info("  Resource Budget: max %s GPU-h/Tag", config.MAX_GPU_HOURS_PER_DAY)
     log.info("  SmartRouter: %s | Composer: %s | Registry: %s",
              "ja" if _has_smart_router else "nein",
              "ja" if _has_composer else "nein",
              "ja" if _has_registry else "nein")
-    log.info("  Nodes configured: %d", len(NODES))
     log.info("=" * 60)
 
     # Initial health check
@@ -619,29 +728,6 @@ async def lifespan(app: FastAPI):
             node_status[name] = {"name": name, "ip": NODES[name]["ip"],
                                  "status": "down", "latency_ms": -1,
                                  "backends": {}, "models_loaded": []}
-
-    # Initialize CentralOrchestrator (bid-based routing via MicroOrchestrators)
-    global _central_orch
-    if _has_central_orch:
-        _central_orch = CentralOrchestrator()
-        # Register devices with their MicroOrchestrator ports
-        # MicroOrchestrator runs on port+1 (e.g. controller:8050 -> MicroOrch:8051)
-        for name, cfg in NODES.items():
-            micro_port = int(os.environ.get(
-                f"{name.upper()}_MICRO_PORT",
-                {"controller": 8051, "desktop": 8101, "laptop": 8151, "mobile": 8201}.get(name, 0)
-            ))
-            if micro_port:
-                _central_orch.register_device(name, cfg["ip"], micro_port)
-        # Check which MicroOrchestrators are alive
-        orch_health = await _central_orch.check_all_devices()
-        for name, status in orch_health.items():
-            log.info("  MicroOrch %s: %s", name, status)
-        log.info("CentralOrchestrator: %d/%d MicroOrchestratoren aktiv",
-                 _central_orch.get_status()["active"],
-                 _central_orch.get_status()["total"])
-    else:
-        log.warning("CentralOrchestrator nicht verfuegbar — Fallback auf model_map")
 
     # Memory DB check
     if Path(DB_PATH).exists():
@@ -667,7 +753,7 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="Way2AGI Orchestrator",
-    version="2.0.0",
+    version="1.0.0",
     description="Zentraler Orchestrierungsserver fuer das Way2AGI System",
     lifespan=lifespan,
 )
@@ -696,9 +782,6 @@ async def health():
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
         "uptime_s": round(time.time() - _startup_time, 1),
-        "consciousness": config.ENABLE_CONSCIOUSNESS if config else False,
-        "nodes_configured": len(NODES),
-        "resource_budget": f"max {config.MAX_GPU_HOURS_PER_DAY} GPU-h/Tag" if config else "unknown",
     }
 
 
@@ -742,52 +825,6 @@ async def get_nodes():
 async def orchestrate(req: OrchestrateRequest):
     t0 = time.time()
     traces: list[dict[str, Any]] = []
-
-    # Use CentralOrchestrator (bid-based) if available, else fallback to model_map
-    if _central_orch and _central_orch.get_status()["active"] > 0:
-        # --- Bid-based orchestration via MicroOrchestrators ---
-        try:
-            result = await _central_orch.orchestrate(req.task, strategy=req.strategy)
-            duration = round(time.time() - t0, 2)
-            routing = result.get("routing", {})
-            response_text = result.get("result", "")
-            traces = result.get("traces", [])
-            traces.insert(0, {"step": "method", "result": "central_orchestrator_bids"})
-
-            save_action_log(
-                "orchestrate", "server",
-                model_used=routing.get("model", ""),
-                device=routing.get("device", ""),
-                input_summary=req.task[:200],
-                output_summary=str(response_text)[:300],
-            )
-            save_trace(
-                "orchestrate", req.task[:2000], str(response_text)[:2000],
-                int(duration * 1000), True, routing.get("model", ""),
-            )
-
-            await broadcast_ws({
-                "type": "orchestrate_complete",
-                "task_preview": req.task[:80],
-                "node": routing.get("device", ""),
-                "model": routing.get("model", ""),
-                "method": "bid",
-                "duration_s": duration,
-                "timestamp": datetime.now().isoformat(),
-            })
-
-            return OrchestrateResponse(
-                result=response_text,
-                routing=routing,
-                duration_s=duration,
-                traces=traces,
-            )
-        except Exception as e:
-            log.warning("CentralOrchestrator fehlgeschlagen, Fallback: %s", e)
-            traces.append({"step": "central_orch_error", "error": str(e)})
-
-    # --- Fallback: hardcoded model_map routing ---
-    traces.append({"step": "method", "result": "model_map_fallback"})
 
     # 1. Classify task
     task_type = classify_task(req.task)
@@ -833,6 +870,7 @@ async def orchestrate(req: OrchestrateRequest):
         int(duration * 1000), True, model_used,
     )
 
+    # Broadcast to WS
     await broadcast_ws({
         "type": "orchestrate_complete",
         "task_preview": req.task[:80],
@@ -966,172 +1004,6 @@ async def memory_search(q: str = Query(..., min_length=1)):
     except Exception as e:
         log.warning("Memory-Suche fehlgeschlagen: %s", e)
         return {"query": q, "results": [], "count": 0, "error": str(e)}
-
-
-# ---------------------------------------------------------------------------
-# Roundtable — Multi-Model Discussion
-# ---------------------------------------------------------------------------
-try:
-    from .roundtable import roundtable as _roundtable_runner
-    _has_roundtable = True
-except ImportError:
-    _roundtable_runner = None  # type: ignore[assignment]
-    _has_roundtable = False
-
-
-class RoundtableRequest(BaseModel):
-    topic: str
-    members: List[str]
-    max_rounds: int = 6
-    include_memory: bool = True
-
-
-@app.post("/v1/roundtable")
-async def run_roundtable(req: RoundtableRequest):
-    """Start a multi-model roundtable discussion."""
-    if not _has_roundtable:
-        raise HTTPException(501, "Roundtable module not available")
-    result = await _roundtable_runner.run_roundtable(
-        topic=req.topic,
-        members=req.members,
-        max_rounds=req.max_rounds,
-        include_memory=req.include_memory,
-    )
-    # Broadcast to WebSocket
-    await broadcast_ws({
-        "type": "roundtable_complete",
-        "topic": req.topic[:60],
-        "rounds": result.get("total_rounds"),
-        "timestamp": datetime.now().isoformat(),
-    })
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Persistent Multi-Agent Discussion (T005d — Grok-Style)
-# ---------------------------------------------------------------------------
-try:
-    from core.multi_agent_loop import (
-        discussion as _discussion,
-        AgentConfig, AgentRole, get_default_jetson_agents,
-    )
-    _has_discussion = True
-except ImportError:
-    _discussion = None  # type: ignore[assignment]
-    _has_discussion = False
-
-
-class DiscussionStartRequest(BaseModel):
-    topic: str
-    agents: Optional[List[dict]] = None  # If None, use defaults
-    round_pause_s: float = 10.0
-
-
-class DiscussionInjectRequest(BaseModel):
-    message: str
-
-
-@app.post("/v1/discussion/start")
-async def start_discussion(req: DiscussionStartRequest):
-    """Start a persistent multi-agent discussion (Grok-style 4-agent loop)."""
-    if not _has_discussion:
-        raise HTTPException(501, "Multi-Agent Discussion module not available")
-
-    # Configure agents
-    if req.agents:
-        agents = [
-            AgentConfig(
-                role=AgentRole(a.get("role", "reasoner")),
-                model=a.get("model", "nemotron-3-nano:30b"),
-                node=a.get("node", "jetson"),
-            )
-            for a in req.agents
-        ]
-    else:
-        agents = get_default_jetson_agents()
-
-    _discussion._round_pause = req.round_pause_s
-    _discussion.configure_agents(agents)
-
-    # Add WebSocket listener
-    async def ws_listener(msg):
-        await broadcast_ws({"type": "discussion_message", **msg})
-    _discussion.add_listener(ws_listener)
-
-    await _discussion.start(req.topic)
-
-    await broadcast_ws({
-        "type": "discussion_started",
-        "topic": req.topic[:60],
-        "agents": [a.role.value for a in agents],
-        "timestamp": datetime.now().isoformat(),
-    })
-
-    return {
-        "status": "running",
-        "topic": req.topic,
-        "agents": [{"role": a.role.value, "model": a.model} for a in agents],
-    }
-
-
-@app.post("/v1/discussion/inject")
-async def inject_discussion(req: DiscussionInjectRequest):
-    """Inject a user message into the running discussion."""
-    if not _has_discussion or not _discussion.state.is_running:
-        raise HTTPException(400, "No active discussion")
-    await _discussion.inject_user_message(req.message)
-    return {"status": "injected", "message": req.message[:100]}
-
-
-@app.get("/v1/discussion/summary")
-async def discussion_summary():
-    """Get compressed view of current discussion."""
-    if not _has_discussion:
-        raise HTTPException(501, "Multi-Agent Discussion module not available")
-    return _discussion.get_summary()
-
-
-@app.get("/v1/discussion/log")
-async def discussion_log():
-    """Get full discussion log."""
-    if not _has_discussion:
-        raise HTTPException(501, "Multi-Agent Discussion module not available")
-    return {"messages": _discussion.get_full_log(), "count": len(_discussion.state.messages)}
-
-
-@app.post("/v1/discussion/stop")
-async def stop_discussion():
-    """Stop the persistent discussion and get final results."""
-    if not _has_discussion or not _discussion.state.is_running:
-        raise HTTPException(400, "No active discussion")
-
-    result = await _discussion.stop()
-    await _discussion.save_to_memory()
-
-    await broadcast_ws({
-        "type": "discussion_stopped",
-        "topic": result.get("topic", ""),
-        "rounds": result.get("total_rounds"),
-        "timestamp": datetime.now().isoformat(),
-    })
-
-    return result
-
-
-@app.get("/v1/orchestrator/status")
-async def orchestrator_status():
-    """Status of the bid-based CentralOrchestrator and its MicroOrchestrators."""
-    if not _central_orch:
-        return {"method": "model_map_fallback", "central_orchestrator": None}
-
-    status = _central_orch.get_status()
-    # Also get capabilities from active MicroOrchestrators
-    caps = await _central_orch.discover_all_capabilities()
-    return {
-        "method": "central_orchestrator_bids",
-        "status": status,
-        "capabilities": caps,
-    }
 
 
 @app.websocket("/ws")

@@ -2,7 +2,7 @@
 """
 Way2AGI Desktop Compute Manager Daemon
 =======================================
-Verwaltet GPU-Ressourcen (YOUR_GPU, 32GB VRAM) fuer Way2AGI.
+Verwaltet GPU-Ressourcen (RTX 5090, 32GB VRAM) fuer Way2AGI.
 Laeuft als standalone Daemon auf dem Desktop PC.
 
 Dependencies:
@@ -12,9 +12,9 @@ Starten:
     python3 desktop_daemon.py
 
 Konfiguration ueber Umgebungsvariablen:
-    OLLAMA_URL          (default: http://YOUR_DESKTOP_IP:11434)
+    OLLAMA_URL          (default: http://YOUR_COMPUTE_NODE_IP:11434)
     DAEMON_PORT         (default: 8100)
-    CONTROLLER_URL      (default: http://YOUR_DESKTOP_IP:8050)
+    CONTROLLER_URL      (default: http://YOUR_COMPUTE_NODE_IP:8050)
     HEARTBEAT_INTERVAL  (default: 60)
     IDLE_TIMEOUT        (default: 1800)
 """
@@ -49,9 +49,9 @@ log = logging.getLogger("compute-daemon")
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://YOUR_DESKTOP_IP:11434")
+OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://YOUR_COMPUTE_NODE_IP:11434")
 DAEMON_PORT: int = int(os.getenv("DAEMON_PORT", "8100"))
-CONTROLLER_URL: str = os.getenv("CONTROLLER_URL", "http://YOUR_DESKTOP_IP:8050")
+CONTROLLER_URL: str = os.getenv("CONTROLLER_URL", "http://YOUR_COMPUTE_NODE_IP:8050")
 HEARTBEAT_INTERVAL: int = int(os.getenv("HEARTBEAT_INTERVAL", "60"))
 IDLE_TIMEOUT: int = int(os.getenv("IDLE_TIMEOUT", "1800"))  # 30 min
 
@@ -512,7 +512,7 @@ class ComputeManager:
     # --- Background Tasks ---
 
     async def _heartbeat_loop(self) -> None:
-        """Sendet regelmaessig Status an den Jetson Controller."""
+        """Sendet regelmaessig Status an den Inference Node Controller."""
         log.info("Heartbeat Loop gestartet (Intervall: %ds)", HEARTBEAT_INTERVAL)
         while not self._shutdown:
             try:
@@ -528,7 +528,7 @@ class ComputeManager:
         health = self._build_health(await self._ping_ollama())
         payload = {
             "node": "desktop",
-            "gpu": "YOUR_GPU",
+            "gpu": "RTX 5090",
             "vram_total_gb": VRAM_TOTAL_GB,
             "vram_used_gb": self._used_vram(),
             "vram_free_gb": self._free_vram(),
@@ -538,7 +538,7 @@ class ComputeManager:
             "health": health.status,
             "uptime": time.time() - self.start_time,
             "total_requests": self.total_requests,
-            "endpoint": f"http://YOUR_DESKTOP_IP:{DAEMON_PORT}",
+            "endpoint": f"http://YOUR_COMPUTE_NODE_IP:{DAEMON_PORT}",
         }
         try:
             resp = await self._http.post(
@@ -552,12 +552,12 @@ class ComputeManager:
             log.debug("Controller nicht erreichbar: %s", e)
 
     async def _register_at_controller(self) -> None:
-        """Registriert diesen Node beim Jetson Controller."""
+        """Registriert diesen Node beim Inference Node Controller."""
         payload = {
             "node": "desktop",
-            "gpu": "YOUR_GPU",
+            "gpu": "RTX 5090",
             "vram_total_gb": VRAM_TOTAL_GB,
-            "endpoint": f"http://YOUR_DESKTOP_IP:{DAEMON_PORT}",
+            "endpoint": f"http://YOUR_COMPUTE_NODE_IP:{DAEMON_PORT}",
             "models": list(MODEL_CATALOG.keys()),
             "capabilities": ["inference", "large-models", "coding", "reasoning"],
         }
@@ -600,7 +600,7 @@ class ComputeManager:
         ram = psutil.virtual_memory()
         return StatusResponse(
             hostname="desktop-rtx5090",
-            gpu_name="NVIDIA YOUR_GPU",
+            gpu_name="NVIDIA RTX 5090",
             vram_total_gb=VRAM_TOTAL_GB,
             vram_used_gb=self._used_vram(),
             vram_free_gb=self._free_vram(),
@@ -645,7 +645,7 @@ class ComputeManager:
 app = FastAPI(
     title="Way2AGI Desktop Compute Daemon",
     version="1.0.0",
-    description="GPU Resource Manager fuer YOUR_GPU",
+    description="GPU Resource Manager fuer RTX 5090",
 )
 manager = ComputeManager()
 
@@ -704,7 +704,7 @@ async def unload(req: UnloadRequest):
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """Health Check fuer Jetson Controller."""
+    """Health Check fuer Inference Node Controller."""
     ollama_ok = await manager._ping_ollama()
     return manager._build_health(ollama_ok)
 
@@ -753,7 +753,7 @@ async def vram_summary():
 def main() -> None:
     log.info("=" * 60)
     log.info("Way2AGI Desktop Compute Daemon v1.0.0")
-    log.info("GPU: YOUR_GPU (32GB VRAM, Budget: %.0fGB)", VRAM_BUDGET_GB)
+    log.info("GPU: RTX 5090 (32GB VRAM, Budget: %.0fGB)", VRAM_BUDGET_GB)
     log.info("Ollama: %s", OLLAMA_URL)
     log.info("Controller: %s", CONTROLLER_URL)
     log.info("Port: %d", DAEMON_PORT)

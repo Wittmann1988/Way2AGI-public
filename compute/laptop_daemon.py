@@ -19,7 +19,7 @@ Starten:
 
 Konfiguration ueber Umgebungsvariablen:
     DAEMON_PORT         (default: 8150)
-    CONTROLLER_URL      (default: http://YOUR_CONTROLLER_IP:8050)
+    CONTROLLER_URL      (default: http://YOUR_INFERENCE_NODE_IP:8050)
     OLLAMA_URL          (default: http://localhost:11434)
     HEARTBEAT_INTERVAL  (default: 60)
     IDLE_TIMEOUT        (default: 1800)
@@ -65,7 +65,7 @@ log = logging.getLogger("laptop-daemon")
 # Config
 # ---------------------------------------------------------------------------
 DAEMON_PORT: int = int(os.getenv("DAEMON_PORT", "8150"))
-CONTROLLER_URL: str = os.getenv("CONTROLLER_URL", "http://YOUR_CONTROLLER_IP:8050")
+CONTROLLER_URL: str = os.getenv("CONTROLLER_URL", "http://YOUR_INFERENCE_NODE_IP:8050")
 OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
 HEARTBEAT_INTERVAL: int = int(os.getenv("HEARTBEAT_INTERVAL", "60"))
 IDLE_TIMEOUT: int = int(os.getenv("IDLE_TIMEOUT", "1800"))  # 30 min
@@ -665,7 +665,7 @@ class LaptopDaemonManager:
     # --- Controller Registration ---
 
     async def _register_at_controller(self) -> None:
-        """Registriert sich beim Jetson Controller."""
+        """Registriert sich beim Inference Node Controller."""
         my_ip = self._get_local_ip()
         models = []
         if self.phi_silica.available:
@@ -752,7 +752,7 @@ class LaptopDaemonManager:
         """Ermittelt die lokale IP-Adresse im Netzwerk."""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("YOUR_CONTROLLER_IP", 80))  # Controller als Ziel
+            s.connect(("YOUR_INFERENCE_NODE_IP", 80))  # Controller als Ziel
             ip = s.getsockname()[0]
             s.close()
             return ip
@@ -853,7 +853,7 @@ async def status():
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """Health Check fuer den Jetson Controller."""
+    """Health Check fuer den Inference Node Controller."""
     return manager.build_health()
 
 

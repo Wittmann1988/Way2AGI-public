@@ -2,7 +2,7 @@
 """
 Way2AGI Universal Node Daemon v2.0
 =================================
-EINZIGER Daemon fuer ALLE Geraete (Jetson, Desktop, Laptop, S24, Phone...)
+EINZIGER Daemon fuer ALLE Geraete (Inference Node, Desktop, Laptop, S24, Phone...)
 100 % depersonalisiert - Nutzt core/config.py
 """
 

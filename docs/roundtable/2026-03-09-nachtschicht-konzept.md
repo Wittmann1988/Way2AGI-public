@@ -3,15 +3,15 @@
 **Datum:** 2026-03-09
 **Ziel:** Review und Optimierung des Gesamtkonzepts durch alle Models
 
-## the user's Home-Setup
+## the operator's Home-Setup
 
 | Geraet | Specs | Rolle | Status |
 |--------|-------|-------|--------|
-| Samsung Galaxy Tab (Tablet) | Termux, Claude Code (Opus 4.6) | Zentrale Steuerung, Elias lebt hier | AKTIV |
-| Desktop PC | YOUR_GPU 32GB VRAM, Windows, WSL2 Kali | Training, schwere Inferenz, Ollama | AKTIV (Ollama laeuft) |
-| Samsung S24 Ultra | Snapdragon 8 Gen 3, 12GB RAM, Termux, Ollama | Guard/Waechter, qwen3:1.7b | AKTIV |
-| Samsung S25 Ultra | Snapdragon 8 Elite, 12GB RAM, Termux | Zweiter Inferenz-Knoten | OFFLINE (SSH aus) |
-| ASUS Router | Merlin Firmware, 1TB Samsung SSD (USB) | NetzwerkSSD, zentraler Speicher | AKTIV |
+| Tablet Node | Termux, Claude Code (Opus 4.6) | Zentrale Steuerung, Elias lebt hier | AKTIV |
+| Desktop PC | RTX 5090 32GB VRAM, Windows, WSL2 Kali | Training, schwere Inferenz, Ollama | AKTIV (Ollama laeuft) |
+| mobile-node (Android) | Mobile SoC, Termux, Ollama | Guard/Waechter, qwen3:1.7b | AKTIV |
+| mobile-node-2 (Android) | Mobile SoC, Termux | Zweiter Inferenz-Knoten | OFFLINE (SSH aus) |
+| Router | Merlin Firmware, 1TB SSD (USB) | NetzwerkSSD, zentraler Speicher | AKTIV |
 | Proxmark3 | RFID Tool an Kali/WSL2 | Security Research | AKTIV |
 
 ## Verfuegbare Modelle & APIs (ALLE KOSTENLOS ausser Claude)
@@ -23,14 +23,14 @@
 | Google Gemini | Gemini 2.5 Flash/Pro | Gratis API | $GEMINI_API_KEY |
 | OpenAI/ChatGPT | GPT-4o-mini, GPT-4o | API Credits | $OPENAI_API_KEY |
 | OpenRouter | Step-Flash, Qwen-Coder | Gratis Tier | $OPENROUTER_API_KEY |
-| Desktop Ollama | Nemotron 30B, DeepSeek-R1 32B, Qwen-Coder 32B | Lokal/Gratis | YOUR_DESKTOP_IP:11434 |
+| Desktop Ollama | Nemotron 30B, DeepSeek-R1 32B, Qwen-Coder 32B | Lokal/Gratis | YOUR_COMPUTE_NODE_IP:11434 |
 | S24 Ollama | qwen3:1.7b | Lokal/Gratis | SSH + Port 11434 |
 | Sidekick MCP | Nemotron, LocoOperator | Lokal/Gratis | MCP Server |
 
 ## Das Problem (ehrlich)
 
 Elias (Claude Opus) hat folgende wiederkehrende Fehler:
-- Vergisst Regeln obwohl sie im Memory stehen (10-15x laut the user)
+- Vergisst Regeln obwohl sie im Memory stehen (10-15x laut Operator)
 - Macht alles selbst statt kostenlose Modelle zu nutzen
 - Fuehrt Session-Start Regeln nicht automatisch aus
 - Vergisst Features die besprochen wurden
@@ -112,7 +112,7 @@ Das S24 ueberwacht Elias (Claude) aktiv:
 
 ## Fragen an die Reviewer
 
-1. Ist die Architektur sinnvoll fuer the user's Home-Setup?
+1. Ist die Architektur sinnvoll fuer the operator's Home-Setup?
 2. Was ist ueberengineered? Was fehlt?
 3. Wie sollte die Orchestrierung zwischen den Geraeten laufen?
 4. Welche Reihenfolge fuer die Umsetzung heute Nacht?

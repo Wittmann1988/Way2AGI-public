@@ -226,10 +226,10 @@ def build_default_registry() -> CapabilityRegistry:
         latency_class="medium",
     ))
 
-    # YOUR_CONTROLLER_DEVICE — local, always-on
+    # Inference Node AGX Orin — local, always-on
     reg.register(ModelSpec(
-        id="qwen3-abl-jetson", provider=Provider.OLLAMA,
-        display_name="Qwen3-Abliterated 8B (Jetson)",
+        id="qwen3-abl-inference-node", provider=Provider.OLLAMA,
+        display_name="Qwen3-Abliterated 8B (Inference Node)",
         capabilities=[
             Capability("reasoning", "general", 0.80),
             Capability("code", "python", 0.75),
@@ -239,11 +239,11 @@ def build_default_registry() -> CapabilityRegistry:
         context_window=32_000, max_output=8_000,
         cost_per_1k_input=0.0, cost_per_1k_output=0.0,
         latency_class="fast", supports_tools=False,
-        metadata={"endpoint": "http://YOUR_CONTROLLER_IP:11434", "model": "huihui_ai/qwen3-abliterated:8b"},
+        metadata={"endpoint": "http://YOUR_INFERENCE_NODE_IP:11434", "model": "huihui_ai/qwen3-abliterated:8b"},
     ))
     reg.register(ModelSpec(
-        id="olmo3-7b-jetson", provider=Provider.OLLAMA,
-        display_name="OLMo-3 7B (Jetson)",
+        id="olmo3-7b-inference-node", provider=Provider.OLLAMA,
+        display_name="OLMo-3 7B (Inference Node)",
         capabilities=[
             Capability("reasoning", "general", 0.72),
             Capability("analysis", "summarization", 0.70),
@@ -251,11 +251,11 @@ def build_default_registry() -> CapabilityRegistry:
         context_window=32_000, max_output=4_000,
         cost_per_1k_input=0.0, cost_per_1k_output=0.0,
         latency_class="fast",
-        metadata={"endpoint": "http://YOUR_CONTROLLER_IP:11434", "model": "olmo-3:7b"},
+        metadata={"endpoint": "http://YOUR_INFERENCE_NODE_IP:11434", "model": "olmo-3:7b"},
     ))
     reg.register(ModelSpec(
-        id="memory-agent-jetson", provider=Provider.OLLAMA,
-        display_name="Way2AGI Memory Agent SFT (Jetson)",
+        id="memory-agent-inference-node", provider=Provider.OLLAMA,
+        display_name="Way2AGI Memory Agent SFT (Inference Node)",
         capabilities=[
             Capability("memory", "store", 0.85),
             Capability("memory", "recall", 0.85),
@@ -264,11 +264,11 @@ def build_default_registry() -> CapabilityRegistry:
         context_window=4_096, max_output=2_000,
         cost_per_1k_input=0.0, cost_per_1k_output=0.0,
         latency_class="fast",
-        metadata={"endpoint": "http://YOUR_CONTROLLER_IP:11434", "model": "way2agi-memory-agent-sft:latest"},
+        metadata={"endpoint": "http://YOUR_INFERENCE_NODE_IP:11434", "model": "way2agi-memory-agent-sft:latest"},
     ))
     reg.register(ModelSpec(
-        id="orchestrator-jetson", provider=Provider.OLLAMA,
-        display_name="Way2AGI Orchestrator (Jetson)",
+        id="orchestrator-inference-node", provider=Provider.OLLAMA,
+        display_name="Way2AGI Orchestrator (Inference Node)",
         capabilities=[
             Capability("orchestration", "routing", 0.80),
             Capability("orchestration", "delegation", 0.75),
@@ -276,13 +276,13 @@ def build_default_registry() -> CapabilityRegistry:
         context_window=4_096, max_output=2_000,
         cost_per_1k_input=0.0, cost_per_1k_output=0.0,
         latency_class="fast",
-        metadata={"endpoint": "http://YOUR_CONTROLLER_IP:11434", "model": "way2agi-orchestrator:latest"},
+        metadata={"endpoint": "http://YOUR_INFERENCE_NODE_IP:11434", "model": "way2agi-orchestrator:latest"},
     ))
 
-    # Desktop PC (YOUR_GPU) — on-demand, 21 models
+    # Desktop PC (RTX 5090) — on-demand, 21 models
     reg.register(ModelSpec(
         id="qwen3.5-9b-desktop", provider=Provider.OLLAMA,
-        display_name="Qwen3.5 9B (Desktop YOUR_GPU)",
+        display_name="Qwen3.5 9B (Desktop RTX 5090)",
         capabilities=[
             Capability("reasoning", "general", 0.88),
             Capability("code", "python", 0.85),
@@ -292,7 +292,7 @@ def build_default_registry() -> CapabilityRegistry:
         context_window=128_000, max_output=16_000,
         cost_per_1k_input=0.0, cost_per_1k_output=0.0,
         latency_class="fast", supports_tools=True,
-        metadata={"endpoint": "http://YOUR_DESKTOP_IP:11434", "model": "qwen3.5:9b"},
+        metadata={"endpoint": "http://YOUR_COMPUTE_NODE_IP:11434", "model": "qwen3.5:9b"},
     ))
     reg.register(ModelSpec(
         id="deepseek-r1-desktop", provider=Provider.OLLAMA,
@@ -305,7 +305,7 @@ def build_default_registry() -> CapabilityRegistry:
         context_window=64_000, max_output=8_000,
         cost_per_1k_input=0.0, cost_per_1k_output=0.0,
         latency_class="fast",
-        metadata={"endpoint": "http://YOUR_DESKTOP_IP:11434", "model": "deepseek-r1:7b"},
+        metadata={"endpoint": "http://YOUR_COMPUTE_NODE_IP:11434", "model": "deepseek-r1:7b"},
     ))
 
     # Google Gemini

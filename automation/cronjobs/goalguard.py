@@ -21,13 +21,14 @@ import logging
 import urllib.request
 import urllib.error
 
-DB_PATH = '/data/way2agi/memory/memory.db'
-LOG_PATH = '/data/way2agi/memory/logs/goalguard.log'
+DB_PATH = '/opt/way2agi/memory/db/elias_memory.db'
+_DB_FALLBACKS = ['/opt/way2agi/memory/memory.db']
+LOG_PATH = '/opt/way2agi/memory/logs/goalguard.log'
 OLLAMA_LOCAL = 'http://localhost:11434'
 NODES = {
-    'jetson': 'http://localhost:11434',
-    'desktop': 'http://YOUR_DESKTOP_IP:8100',
-    'zenbook': 'http://YOUR_LAPTOP_IP:11434',
+    'inference-node': 'http://localhost:11434',
+    'desktop': 'http://YOUR_COMPUTE_NODE_IP:8100',
+    'npu-node': 'http://YOUR_NPU_NODE_IP:11434',
 }
 
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -43,9 +44,28 @@ log = logging.getLogger('goalguard')
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Robuste DB-Verbindung mit Fallback-Pfaden."""
+    import os as _os
+    for db_path in [DB_PATH] + _DB_FALLBACKS:
+        try:
+            _os.makedirs(_os.path.dirname(db_path), exist_ok=True)
+            conn = sqlite3.connect(db_path, timeout=30)
+            conn.row_factory = sqlite3.Row
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if 'rules' in tables and 'todos' in tables:
+                # Prevention: Pruefe ob Rules vorhanden, WARNE wenn 0
+                rule_count = conn.execute("SELECT COUNT(*) FROM rules WHERE status='active'").fetchone()[0]
+                if rule_count == 0:
+                    log.critical("WARNUNG: 0 aktive Rules in %s! GoalGuard ist WIRKUNGSLOS ohne Rules.", db_path)
+                    log.critical("Pruefe ob die richtige DB verwendet wird oder ob Rules importiert werden muessen.")
+                else:
+                    log.info("DB verbunden: %s (%d aktive Rules)", db_path, rule_count)
+                return conn
+            conn.close()
+        except Exception as e:
+            log.warning("DB %s nicht nutzbar: %s", db_path, e)
+    raise RuntimeError("Keine nutzbare DB mit rules+todos gefunden!")
+
 
 
 def check_node_health(url, timeout=5):
@@ -88,7 +108,7 @@ def log_action(conn, action_type, module, details, success=True):
     """Loggt Aktion in action_log."""
     conn.execute(
         'INSERT INTO action_log (action_type, module, input_summary, success, device) VALUES (?, ?, ?, ?, ?)',
-        (action_type, module, details[:500], 1 if success else 0, 'jetson')
+        (action_type, module, details[:500], 1 if success else 0, 'inference-node')
     )
     conn.commit()
 
@@ -195,7 +215,7 @@ def process_todos(conn):
         todo_id = todo['id']
         title = todo['title']
         impl = todo['implementation'] or ''
-        assigned = todo['assigned_to'] or 'jetson'
+        assigned = todo['assigned_to'] or 'inference-node'
 
         log.info('  Bearbeite %s (P%d): %s', todo_id, todo['priority'], title[:60])
 

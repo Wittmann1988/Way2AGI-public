@@ -1,8 +1,8 @@
-# Roundtable: the user's 6 Regeln -> Implementierbare TODOs
+# Roundtable: the operator's 6 Regeln -> Implementierbare TODOs
 **Datum:** 2026-03-10
 **Koordinator:** Claude Opus 4.6
 **Teilnehmer:** Gemini 2.5 Flash (OpenRouter), Llama 4 Maverick (OpenRouter), DeepSeek R1 (OpenRouter), Claude Opus 4.6 (lokal)
-**Status lokale Modelle:** nemotron-3-nano:30b (Jetson), qwen3.5:9b (Desktop) -- generieren noch parallel, Ergebnisse koennen nachtraeglich ergaenzt werden.
+**Status lokale Modelle:** nemotron-3-nano:30b (Inference Node), qwen3.5:9b (Desktop) -- generieren noch parallel, Ergebnisse koennen nachtraeglich ergaenzt werden.
 
 ---
 
@@ -68,7 +68,7 @@
 - Regelmaessige Pruefung und Anpassungsvorschlaege
 
 **R4 Selbstreflexion:**
-- Feature-Ideen-Generator ueber the user's Regeln hinaus
+- Feature-Ideen-Generator ueber the operator's Regeln hinaus
 - Bewertungsfunktion fuer Nuetzlichkeit/Umsetzbarkeit
 - Session-Verbesserungs-Mechanismus
 
@@ -101,7 +101,7 @@
 
 **R2 Selbstbeobachtung:**
 - `action_logger.sql`: SQL-Trigger protokollieren alle DB-Aenderungen in episodic/action_logs
-- `sysmon_collector`: Jetson/RTX Ressourcennutzung (GPU-RAM, CPU-Last)
+- `sysmon_collector`: Inference Node/RTX Ressourcennutzung (GPU-RAM, CPU-Last)
 
 **R3 Schluesse+Fehler:**
 - `error_patterns.py`: NLP-Analyse mit spaCy zur Fehlerkategorisierung
@@ -116,14 +116,14 @@
 - Repo-Analyse: GitHub-Trends mit >100 Sternen klassifizieren
 
 **R6 Training:**
-- RLHF-Modul fuer Orchestrator via NVIDIA NeMo auf Jetson
+- RLHF-Modul fuer Orchestrator via NVIDIA NeMo auf Inference Node
 - Semantic-Memory-Vectorization: Sentence-BERT + SQLite-VSS
 
 **R7 Weiterentwicklung:**
 - CI/CD-Pipeline: Auto-PR bei Research -> Roundtable -> Codegen
-- `autocoder.py`: Code-Llama 34B auf YOUR_GPU
+- `autocoder.py`: Code-Llama 34B auf RTX 5090
 
-**Eigene Features:** Self-Repair-Modus (Failover Jetson->Desktop), Dynamic Goal Reweighting (GPU-Auslastung), Ethical Oversight Layer
+**Eigene Features:** Self-Repair-Modus (Failover Inference Node->Desktop), Dynamic Goal Reweighting (GPU-Auslastung), Ethical Oversight Layer
 **Memory:** +rules (priority, last_updated), +todos (deadline, status), +milestones (progress, dependencies), +endgoals (metrics, target_date), FTS5-Index, JSON-Versionierung
 
 ---
@@ -155,13 +155,13 @@
 - Auto-Roundtable: Findings an alle verfuegbaren Modelle senden, Konsens dokumentieren
 
 **R6 Training:**
-- `training-pipeline.sh`: Woechtentlich Traces sammeln -> Bewerten -> SFT/DPO Training auf Desktop YOUR_GPU
+- `training-pipeline.sh`: Woechtentlich Traces sammeln -> Bewerten -> SFT/DPO Training auf Desktop RTX 5090
 - Memory-Embedding-Update: Alle 3 Tage Sentence-BERT Embeddings neu berechnen
 - Consciousness-Model: Monatlich mit neuen Self-Mirroring-Daten fine-tunen
 
 **R7 Weiterentwicklung:**
 - `auto-implement.py`: Research-Finding -> Roundtable -> Konzept -> PR -> Test -> Merge
-- Multi-Device-Scheduler: Jetson fuer kleine Modelle, Desktop fuer grosse, Cloud fuer Peaks
+- Multi-Device-Scheduler: Inference Node fuer kleine Modelle, Desktop fuer grosse, Cloud fuer Peaks
 - `model-router.py`: Automatische Modellauswahl basierend auf Task-Typ und Verfuegbarkeit
 
 **Eigene Features:**
@@ -169,7 +169,7 @@
 2. **Cross-Session Learning**: Erkenntnisse aus Session N automatisch als Kontext in Session N+1 injizieren
 3. **Autonomous Goal Discovery**: Elias identifiziert selbst neue Zwischenziele basierend auf Gap-Analyse (Ist vs. Soll)
 
-**Memory:** +rules (immutable_rules + learned_rules, mit Versionshistorie), +todos (priority-queue mit automatischem Aging), +milestones (DAG mit Abhaengigkeiten), +endgoal (singulär, unveraenderlich ohne the user), +meta (Memory-ueber-Memory: wie oft wurde was abgefragt, Nutzungsstatistiken)
+**Memory:** +rules (immutable_rules + learned_rules, mit Versionshistorie), +todos (priority-queue mit automatischem Aging), +milestones (DAG mit Abhaengigkeiten), +endgoal (singulär, unveraenderlich ohne den Operator), +meta (Memory-ueber-Memory: wie oft wurde was abgefragt, Nutzungsstatistiken)
 
 ---
 
@@ -177,7 +177,7 @@
 
 ### Memory-Erweiterung
 **EINSTIMMIG**: Die 4 neuen Kategorien sind noetig:
-- **rules** -- Regeln mit Prioritaet, Quelle (the user vs. selbst-gelernt), Status
+- **rules** -- Regeln mit Prioritaet, Quelle (Operator vs. selbst-gelernt), Status
 - **todos** -- Priorisierte Aufgabenliste mit Deadline und Status
 - **milestones** -- Zwischenziele mit Fortschritt und Abhaengigkeiten
 - **endgoal** -- Endziel-Definition mit Metriken
@@ -204,7 +204,7 @@
 | Thema | Gemini | Maverick | DeepSeek | Claude |
 |-------|--------|----------|----------|--------|
 | Fehleranalyse | Regex + ML | Einfaches Lernmodul | spaCy NLP | Hash-Deduplizierung |
-| Training-Frequenz | Woechentlich | Keine Angabe | Jetson NeMo | Woechentlich+Monatlich |
+| Training-Frequenz | Woechentlich | Keine Angabe | Inference Node NeMo | Woechentlich+Monatlich |
 | Auto-Implementierung | concept_to_code.py | Konzept-Tool | autocoder.py + CI/CD | auto-implement.py + PR |
 | Memory-Meta | Nein | Nein | JSON-Versionierung | meta-Tabelle (Nutzungsstatistik) |
 | Eigene Features | Empathie | Lernplaene | Self-Repair/Failover | Predictive Maintenance |
@@ -270,7 +270,7 @@ TODO-006: daily_research.py
 
 TODO-007: auto_roundtable.py
   - Nimmt Research-Findings als Input
-  - Sendet an alle verfuegbaren Modelle (Jetson, Desktop, Cloud)
+  - Sendet an alle verfuegbaren Modelle (Inference Node, Desktop, Cloud)
   - Sammelt Antworten, extrahiert Konsens/Dissens
   - Speichert Roundtable-Protokoll in episodic Memory
   Aufwand: 2-3h
@@ -298,7 +298,7 @@ TODO-009: feature_brainstorm.py
 TODO-010: training_pipeline.sh
   - Woechentlich: Traces aus action_log sammeln
   - Bewerten (automatisch + manuell)
-  - SFT/DPO Training auf Desktop YOUR_GPU
+  - SFT/DPO Training auf Desktop RTX 5090
   - Modelle: way2agi-orchestrator, way2agi-memory-agent, elias-consciousness
   Aufwand: 4-6h
 
@@ -319,7 +319,7 @@ TODO-012: auto_implement.py
 
 TODO-013: model_router.py
   - Task-basierte Modellauswahl
-  - Jetson: kleine Modelle (<8B), schnelle Inference
+  - Inference Node: kleine Modelle (<8B), schnelle Inference
   - Desktop: grosse Modelle (>24B), Training
   - Cloud: Peaks, Roundtables, Research
   - Fallback-Ketten bei Nicht-Erreichbarkeit
@@ -327,7 +327,7 @@ TODO-013: model_router.py
 
 TODO-014: failover_controller.py (DeepSeek-Vorschlag)
   - Bei Hardware-Fehlern automatisch migrieren
-  - Jetson -> Desktop -> Cloud
+  - Inference Node -> Desktop -> Cloud
   - Health-Checks alle 5 Minuten
   Aufwand: 2-3h
 ```

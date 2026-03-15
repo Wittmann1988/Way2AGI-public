@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Training Cronjob — Alle 5 Tage Traces sammeln und Training auf Desktop (YOUR_GPU) starten.
+Training Cronjob — Alle 5 Tage Traces sammeln und Training auf Desktop (RTX 5090) starten.
 Trainiert: memory-agent, orchestrator-agent, consciousness-agent.
 """
 
@@ -13,13 +13,10 @@ import os
 import sys
 import subprocess
 
-DB_PATH = '/data/way2agi/memory/memory.db'
-LOG_PATH = '/data/way2agi/memory/logs/training.log'
+DB_PATH = '/opt/way2agi/memory/memory.db'
+LOG_PATH = '/opt/way2agi/memory/logs/training.log'
 TRACES_DIR = '/data/traces'
-DESKTOP_SSH = 'YOUR_SSH_USER@YOUR_DESKTOP_IP'
-# WSL2 Ubuntu auf Desktop fuer GPU-Training (YOUR_GPU, CUDA 13.0)
-DESKTOP_WSL_DISTRO = 'Ubuntu-22.04'
-DESKTOP_WSL_PROJECT = '/home/erik/Way2AGI'
+DESKTOP_SSH = 'YOUR_USER@YOUR_COMPUTE_NODE_IP'
 
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
 os.makedirs(TRACES_DIR, exist_ok=True)
@@ -85,40 +82,26 @@ def export_training_data(traces, model_info, output_path):
 
 
 def trigger_desktop_training(model_info, data_path):
-    """Startet Training auf Desktop WSL2 (Ubuntu 22.04 + YOUR_GPU) via SSH."""
+    """Startet Training auf Desktop via SSH."""
     try:
-        # 1. SCP Trainingsdaten zum Desktop (Windows-Seite)
-        remote_data = 'C:/temp_training/%s.jsonl' % model_info['name']
+        # SCP Trainingsdaten zum Desktop
         scp_cmd = ['scp', '-o', 'ConnectTimeout=10', data_path,
-                    '%s:%s' % (DESKTOP_SSH, remote_data)]
+                    '%s:C:/Way2AGI/training/%s.jsonl' % (DESKTOP_SSH, model_info['name'])]
         result = subprocess.run(scp_cmd, capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
             log.error('SCP fehlgeschlagen: %s', result.stderr)
             return False
 
-        # 2. Daten in WSL2 kopieren
-        wsl_data = '%s/training/%s.jsonl' % (DESKTOP_WSL_PROJECT, model_info['name'])
-        copy_cmd = [
-            'ssh', '-o', 'ConnectTimeout=10', DESKTOP_SSH,
-            'wsl -d %s -- cp /mnt/c/temp_training/%s.jsonl %s' % (
-                DESKTOP_WSL_DISTRO, model_info['name'], wsl_data)
-        ]
-        result = subprocess.run(copy_cmd, capture_output=True, text=True, timeout=15)
-        if result.returncode != 0:
-            log.warning('WSL copy warning: %s', result.stderr)
-
-        # 3. Training in WSL2 starten (GPU via CUDA passthrough)
-        train_script = (
-            'cd %s && WAY2AGI_ROOT=%s '
-            '/home/erik/.local/bin/python3 -m training.src.train_agent '
-            '--agent %s --data %s --epochs 3 --lr 2e-4'
-        ) % (DESKTOP_WSL_PROJECT, DESKTOP_WSL_PROJECT, model_info['name'], wsl_data)
-
+        # Training-Befehl auf Desktop starten (im Hintergrund)
         train_cmd = [
             'ssh', '-o', 'ConnectTimeout=10', DESKTOP_SSH,
-            'wsl -d %s -- bash -c "%s"' % (DESKTOP_WSL_DISTRO, train_script)
+            'cd C:/Way2AGI && python training/train_lora.py '
+            '--base-model %s --data training/%s.jsonl '
+            '--output models/%s --epochs 3 --lr 2e-4' % (
+                model_info['base_model'], model_info['name'], model_info['name']
+            )
         ]
-        log.info('Starte WSL2 Training: %s auf %s', model_info['name'], DESKTOP_WSL_DISTRO)
+        log.info('Starte Training: %s', ' '.join(train_cmd[-1:]))
         # Nicht-blockierend starten
         subprocess.Popen(train_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
@@ -155,7 +138,7 @@ def main():
             continue
 
         # 3. Training auf Desktop starten
-        log.info('  Starte Training auf Desktop (YOUR_GPU)...')
+        log.info('  Starte Training auf Desktop (RTX 5090)...')
         success = trigger_desktop_training(model_info, output_path)
 
         if success:

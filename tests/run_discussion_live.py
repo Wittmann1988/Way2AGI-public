@@ -84,8 +84,8 @@ async def main():
 
     topic = (
         "TODO T003: Orchestrierung hat ABSOLUTE PRIORITAET. "
-        "Wie sollen wir die 4 Compute-Nodes (Jetson 64GB, Desktop RTX5090, "
-        "Zenbook NPU, S24 Ultra) am besten orchestrieren? "
+        "Wie sollen wir die 4 Compute-Nodes (Inference Node 64GB, Desktop RTX5090, "
+        "npu-node NPU, S24 Ultra) am besten orchestrieren? "
         "Welches Modell auf welchem Node? Wie Load-Balancing? "
         "Was ist die optimale Strategie?"
     )
@@ -106,7 +106,7 @@ async def main():
     # User-Injection
     print(f"\n\033[1;37m>>> USER INJECTION: Frage wird eingespeist...\033[0m\n")
     await loop.inject_user_message(
-        "Soll der Jetson alleine als Controller reichen oder brauchen wir Redundanz?"
+        "Soll der Inference Node alleine als Controller reichen oder brauchen wir Redundanz?"
     )
     await asyncio.sleep(50)
 

@@ -8,7 +8,7 @@ Nutzt http.server + urllib fuer minimale Dependencies.
 Start:
     python3 s24_daemon_lite.py
 
-API: http://YOUR_MOBILE_IP:8200/health
+API: http://YOUR_MOBILE_NODE_IP:8200/health
 """
 
 import asyncio
@@ -40,7 +40,7 @@ log = logging.getLogger("s24")
 DAEMON_PORT = 8200
 OLLAMA_URL = "http://localhost:11434"
 MODEL = "qwen3:1.7b"
-CONTROLLER_URL = "http://YOUR_CONTROLLER_IP:8050"
+CONTROLLER_URL = "http://YOUR_INFERENCE_NODE_IP:8050"
 HEARTBEAT_INTERVAL = 120
 BATTERY_LOW_THRESHOLD = 20
 START_TIME = time.time()
@@ -109,7 +109,7 @@ def ollama_alive() -> bool:
 def register_at_controller() -> bool:
     payload = json.dumps({
         "name": "s24",
-        "url": f"http://YOUR_MOBILE_IP:{DAEMON_PORT}",
+        "url": f"http://YOUR_MOBILE_NODE_IP:{DAEMON_PORT}",
         "node_type": "compute",
         "vram": 0,
         "models": [MODEL],
@@ -138,7 +138,7 @@ def heartbeat_loop():
             time.sleep(HEARTBEAT_INTERVAL)
             payload = json.dumps({
                 "name": "s24",
-                "url": f"http://YOUR_MOBILE_IP:{DAEMON_PORT}",
+                "url": f"http://YOUR_MOBILE_NODE_IP:{DAEMON_PORT}",
                 "node_type": "compute",
                 "vram": 0,
                 "models": [MODEL] if not is_battery_low() else [],

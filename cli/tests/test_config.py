@@ -42,11 +42,11 @@ def test_deep_merge_preserves_defaults(tmp_path):
     # Save partial config
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
-        json.dump({"provider": "groq", "user_name": "the user"}, f)
+        json.dump({"provider": "groq", "user_name": "operator"}, f)
     cfg = Way2AGIConfig(config_path=path)
     # Overridden
     assert cfg.provider == "groq"
-    assert cfg.get("user_name") == "the user"
+    assert cfg.get("user_name") == "operator"
     # Defaults preserved
     assert cfg.get("memory.enabled") is True
     assert "anthropic" in cfg._data["providers"]

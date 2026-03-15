@@ -60,7 +60,7 @@ CREATE TABLE todos (
     status TEXT DEFAULT 'open',               -- open/in_progress/blocked/done/cancelled
     error_id TEXT REFERENCES errors(id),      -- FK: Aus welchem Fehler entstand dieses TODO?
     milestone_id TEXT REFERENCES milestones(id), -- FK: Gehoert zu welchem Meilenstein?
-    assigned_to TEXT,                         -- jetson/desktop/zenbook/cloud/erik/elias
+    assigned_to TEXT,                         -- inference-node/compute-node/npu-node/cloud/erik/elias
     deadline TEXT,
     implementation TEXT,                       -- Konkreter Implementierungsplan
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -83,26 +83,26 @@ CREATE TABLE milestones (
     completed_at TEXT
 );
 
--- ENDGOAL: Das ultimative Ziel (selten geaendert, nur durch the user)
+-- ENDGOAL: Das ultimative Ziel (selten geaendert, nur durch den Operator)
 CREATE TABLE endgoal (
     id TEXT PRIMARY KEY,
     description TEXT NOT NULL,
     metrics JSON,                             -- Messbare Kriterien
     target_date TEXT,
     last_reviewed TEXT,
-    reviewed_by TEXT DEFAULT 'erik',
+    reviewed_by TEXT DEFAULT 'operator',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- RULES: Alle Regeln (the user's + selbst-gelernte)
+-- RULES: Alle Regeln (the operator's + selbst-gelernte)
 CREATE TABLE rules (
     id TEXT PRIMARY KEY,
     rule_text TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'erik',       -- erik/learned/roundtable
+    source TEXT NOT NULL DEFAULT 'operator',       -- erik/learned/roundtable
     priority INTEGER NOT NULL DEFAULT 50,
     condition TEXT,                            -- Wann greift diese Regel?
     action TEXT,                               -- Was soll passieren?
-    is_immutable INTEGER DEFAULT 0,           -- 1 = nur the user kann aendern
+    is_immutable INTEGER DEFAULT 0,           -- 1 = nur the operator kann aendern
     version INTEGER DEFAULT 1,
     status TEXT DEFAULT 'active',              -- active/deprecated/superseded
     superseded_by TEXT REFERENCES rules(id),
@@ -117,7 +117,7 @@ CREATE TABLE action_log (
     action_type TEXT NOT NULL,                -- inference/memory_write/memory_read/tool_call/error/decision
     module TEXT,                               -- orchestrator/memory/network_agent/goalguard/research
     model_used TEXT,                           -- welches Modell
-    device TEXT,                               -- jetson/desktop/zenbook/s24/cloud
+    device TEXT,                               -- inference-node/compute-node/npu-node/s24/cloud
     input_summary TEXT,
     output_summary TEXT,
     duration_ms REAL,
@@ -141,7 +141,7 @@ CREATE TABLE meta (
 CREATE TABLE model_evaluations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     model_name TEXT NOT NULL,                 -- lfm2:24b, smallthinker:1.8b, etc.
-    device TEXT NOT NULL,                     -- jetson/desktop/zenbook
+    device TEXT NOT NULL,                     -- inference-node/compute-node/npu-node
     task_type TEXT NOT NULL,                  -- triage/classification/reasoning/code/summarization
     quality_score REAL,                       -- 1-5
     latency_ms REAL,
@@ -180,14 +180,14 @@ CREATE VIRTUAL TABLE errors_fts USING fts5(description, prevention, content=erro
 2. ALTER TABLE / CREATE TABLE fuer alle neuen Tabellen
 3. Bestehende Fehler-Memories in errors-Tabelle migrieren
 4. Bestehende Goals in milestones-Tabelle uebertragen
-5. the user's 6 Regeln in rules-Tabelle einfuegen (is_immutable=1)
+5. the operator's 6 Regeln in rules-Tabelle einfuegen (is_immutable=1)
 6. FTS5 Indizes erstellen
 7. Verify: Alle bestehenden Queries funktionieren noch
 ```
 
 ### Phase 2: ChromaDB Installation (1h)
 ```
-1. pip install chromadb sentence-transformers (auf Jetson)
+1. pip install chromadb sentence-transformers (auf Inference Node)
 2. Collections anlegen (memories, errors, knowledge, rules)
 3. Bestehende 36 Memories mit Embeddings versehen
 4. Sync-Script: SQLite <-> ChromaDB bei jedem Write

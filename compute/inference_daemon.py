@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Way2AGI Jetson Controller Daemon
+Way2AGI Inference Node Controller Daemon
 ================================
 Zentraler Controller fuer das Way2AGI Compute-Netzwerk.
-Laeuft auf dem YOUR_CONTROLLER_DEVICE und orchestriert alle Nodes.
+Laeuft auf dem Inference Node AGX Orin und orchestriert alle Nodes.
 
 Dependencies:
     pip install fastapi uvicorn httpx apscheduler pydantic
 
 Start:
-    python3 jetson_daemon.py
-    # oder: uvicorn jetson_daemon:app --host 0.0.0.0 --port 8050
+    python3 inference_daemon.py
+    # oder: uvicorn inference_daemon:app --host 0.0.0.0 --port 8050
 
-API: http://YOUR_CONTROLLER_IP:8050/docs
+API: http://YOUR_INFERENCE_NODE_IP:8050/docs
 """
 
 import asyncio
@@ -43,10 +43,10 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(os.environ.get("LOG_PATH", "/tmp/jetson_daemon.log"), mode="a"),
+        logging.FileHandler(os.environ.get("LOG_PATH", "/tmp/inference_daemon.log"), mode="a"),
     ],
 )
-log = logging.getLogger("jetson-ctrl")
+log = logging.getLogger("inference-ctrl")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -55,8 +55,8 @@ DAEMON_PORT = 8050
 HEARTBEAT_INTERVAL = 60  # Sekunden
 CIRCUIT_BREAKER_COOLDOWN = 30  # Sekunden
 OLLAMA_LOCAL = "http://localhost:11434"
-DESKTOP_NODE_URL = "http://YOUR_DESKTOP_IP:8100"
-ACTION_LOG_DB = "/data/way2agi/memory/memory.db"
+DESKTOP_NODE_URL = "http://YOUR_COMPUTE_NODE_IP:8100"
+ACTION_LOG_DB = "/opt/way2agi/memory/memory.db"
 
 # ---------------------------------------------------------------------------
 # Node Registry
@@ -89,31 +89,31 @@ class NodeInfo(BaseModel):
 
 
 # Statische Node-Definitionen — werden beim Start geladen
-# 4-fache Redundanz: Desktop, Jetson, Zenbook (Win Laptop), S24
+# 4-fache Redundanz: Desktop, Inference Node, npu-node (Win Laptop), S24
 DEFAULT_NODES: dict[str, dict] = {
-    "jetson": {
+    "inference-node": {
         "url": OLLAMA_LOCAL,
         "type": "controller",
         "vram": 32000,
-        "description": "YOUR_CONTROLLER_DEVICE — Controller, Memory, Identity, Always-On",
+        "description": "Inference Node AGX Orin — Controller, Memory, Identity, Always-On",
     },
     "desktop": {
         "url": DESKTOP_NODE_URL,
         "type": "compute",
         "vram": 32000,
-        "description": "Desktop YOUR_GPU — Heavy Inference, 21 Modelle",
+        "description": "Desktop RTX 5090 — Heavy Inference, 21 Modelle",
     },
-    "zenbook": {
-        "url": "http://YOUR_LAPTOP_IP:8150",
+    "npu-node": {
+        "url": "http://YOUR_NPU_NODE_IP:8150",
         "type": "compute",
         "vram": 0,
-        "description": "ASUS Zenbook Win11 — Phi Silica NPU, Light Inference",
+        "description": "ASUS npu-node Win11 — Phi Silica NPU, Light Inference",
     },
     "s24": {
-        "url": "http://YOUR_MOBILE_IP:8200",
+        "url": "http://YOUR_MOBILE_NODE_IP:8200",
         "type": "compute",
         "vram": 0,
-        "description": "Samsung S24 Ultra — qwen3:1.7b, Triage/Classification",
+        "description": "mobile-node (Android) — qwen3:1.7b, Triage/Classification",
     },
     "cloud-groq": {
         "url": "https://api.groq.com/openai/v1",
@@ -141,7 +141,7 @@ DEFAULT_NODES: dict[str, dict] = {
     },
 }
 
-# Bekannte lokale Modelle auf dem Jetson
+# Bekannte lokale Modelle auf dem Inference Node
 JETSON_MODELS = [
     "way2agi-memory-agent-sft",
     "nemotron-3-nano:30b",
@@ -158,20 +158,20 @@ JETSON_MODELS = [
 # Fallback-Kette: preferred -> secondary -> tertiary -> cloud
 CAPABILITY_MAP: dict[str, dict[str, Any]] = {
     # === Tier 1: Ultra-Light (1.5-1.8B) — Routing, Triage, Simple Tasks ===
-    "triage": {"model": "mannix/smallthinker-abliterated", "preferred_node": "jetson", "fallback": ["s24", "desktop"]},
-    "classification": {"model": "mannix/smallthinker-abliterated", "preferred_node": "jetson", "fallback": ["s24", "desktop"]},
-    "orchestration": {"model": "mannix/smallthinker-abliterated", "preferred_node": "jetson", "fallback": ["s24", "desktop"]},
-    "network": {"model": "mannix/smallthinker-abliterated", "preferred_node": "jetson", "fallback": ["s24", "desktop"]},
-    "light": {"model": "mannix/smallthinker-abliterated", "preferred_node": "jetson", "fallback": ["s24", "zenbook"]},
-    "memory": {"model": "way2agi-memory-agent-sft", "preferred_node": "jetson", "fallback": ["desktop"]},
+    "triage": {"model": "mannix/smallthinker-abliterated", "preferred_node": "inference-node", "fallback": ["s24", "desktop"]},
+    "classification": {"model": "mannix/smallthinker-abliterated", "preferred_node": "inference-node", "fallback": ["s24", "desktop"]},
+    "orchestration": {"model": "mannix/smallthinker-abliterated", "preferred_node": "inference-node", "fallback": ["s24", "desktop"]},
+    "network": {"model": "mannix/smallthinker-abliterated", "preferred_node": "inference-node", "fallback": ["s24", "desktop"]},
+    "light": {"model": "mannix/smallthinker-abliterated", "preferred_node": "inference-node", "fallback": ["s24", "npu-node"]},
+    "memory": {"model": "way2agi-memory-agent-sft", "preferred_node": "inference-node", "fallback": ["desktop"]},
     # === Tier 2: Medium (8B) — Reflexion, General, Quick Tasks ===
-    "general": {"model": "huihui_ai/qwen3-abliterated:8b", "preferred_node": "jetson", "fallback": ["desktop", "cloud-groq"]},
-    "quick": {"model": "huihui_ai/qwen3-abliterated:8b", "preferred_node": "jetson", "fallback": ["desktop", "cloud-groq"]},
-    "thinking": {"model": "huihui_ai/qwen3-abliterated:8b", "preferred_node": "jetson", "fallback": ["desktop"]},
+    "general": {"model": "huihui_ai/qwen3-abliterated:8b", "preferred_node": "inference-node", "fallback": ["desktop", "cloud-groq"]},
+    "quick": {"model": "huihui_ai/qwen3-abliterated:8b", "preferred_node": "inference-node", "fallback": ["desktop", "cloud-groq"]},
+    "thinking": {"model": "huihui_ai/qwen3-abliterated:8b", "preferred_node": "inference-node", "fallback": ["desktop"]},
     # === Tier 3: Heavy (14B+) — nur fuer Code, Deep Reasoning, Research ===
-    "code": {"model": "qwen3-coder", "preferred_node": "desktop", "fallback": ["jetson", "cloud-groq"]},
-    "reasoning": {"model": "deepseek-r1", "preferred_node": "desktop", "fallback": ["jetson", "cloud-groq"]},
-    "research": {"model": "nemotron-3-nano:30b", "preferred_node": "jetson", "fallback": ["desktop", "cloud-gemini"]},
+    "code": {"model": "qwen3-coder", "preferred_node": "desktop", "fallback": ["inference-node", "cloud-groq"]},
+    "reasoning": {"model": "deepseek-r1", "preferred_node": "desktop", "fallback": ["inference-node", "cloud-groq"]},
+    "research": {"model": "nemotron-3-nano:30b", "preferred_node": "inference-node", "fallback": ["desktop", "cloud-gemini"]},
 }
 
 # ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ class DaemonState:
                 url=cfg["url"],
                 type=cfg["type"],
                 vram=cfg["vram"],
-                models=JETSON_MODELS if name == "jetson" else [],
+                models=JETSON_MODELS if name == "inference-node" else [],
             )
         log.info("State initialisiert mit %d Nodes", len(self.nodes))
 
@@ -286,7 +286,7 @@ async def heartbeat_all() -> None:
                 else:
                     node.status = NodeStatus.OFFLINE
                     node.error_count += 1
-                    log.warning("Jetson Ollama offline — versuche Neustart")
+                    log.warning("Inference Node Ollama offline — versuche Neustart")
                     await try_restart_ollama()
 
             elif node.node_type == NodeType.COMPUTE:
@@ -350,8 +350,8 @@ async def try_restart_ollama() -> None:
 # Action Logger (E022 Fix)
 # ---------------------------------------------------------------------------
 
-def log_action(action_type, module="jetson_daemon", model_used=None,
-               device="jetson", input_summary=None, output_summary=None,
+def log_action(action_type, module="inference_daemon", model_used=None,
+               device="inference-node", input_summary=None, output_summary=None,
                duration_ms=None, success=1, error_id=None):
     """Log an action to action_log table for Selbstbeobachtung."""
     try:
@@ -401,12 +401,12 @@ def pick_node_and_model(req: JobRequest) -> tuple[str, str, str]:
     """
     # 1. Explizites Modell angegeben?
     if req.model:
-        # Ist es lokal auf Jetson?
-        jetson = state.nodes.get("jetson")
-        if jetson and jetson.status == NodeStatus.ONLINE:
-            for m in jetson.models:
+        # Ist es lokal auf Inference Node?
+        inference-node = state.nodes.get("inference-node")
+        if inference-node and inference-node.status == NodeStatus.ONLINE:
+            for m in inference-node.models:
                 if req.model in m or m in req.model:
-                    return "jetson", req.model, f"Modell '{req.model}' lokal auf Jetson verfuegbar"
+                    return "inference-node", req.model, f"Modell '{req.model}' lokal auf Inference Node verfuegbar"
 
         # Ist es auf Desktop?
         desktop = state.nodes.get("desktop")
@@ -435,15 +435,15 @@ def pick_node_and_model(req: JobRequest) -> tuple[str, str, str]:
             if ninfo.status == NodeStatus.ONLINE and nname != preferred:
                 return nname, model, f"Capability '{req.capability}' Fallback -> {nname}/{model}"
 
-    # 3. Default: Jetson mit qwen3:8b
-    jetson = state.nodes.get("jetson")
-    if jetson and jetson.status == NodeStatus.ONLINE:
-        return "jetson", "qwen3:8b", "Default-Routing -> Jetson/qwen3:8b"
+    # 3. Default: Inference Node mit qwen3:8b
+    inference-node = state.nodes.get("inference-node")
+    if inference-node and inference-node.status == NodeStatus.ONLINE:
+        return "inference-node", "qwen3:8b", "Default-Routing -> Inference Node/qwen3:8b"
 
     # 4. Desktop Fallback
     desktop = state.nodes.get("desktop")
     if desktop and desktop.status == NodeStatus.ONLINE:
-        return "desktop", "qwen3:8b", "Jetson offline -> Desktop Fallback"
+        return "desktop", "qwen3:8b", "Inference Node offline -> Desktop Fallback"
 
     # 5. Cloud Fallback
     cloud = _pick_cloud_fallback()
@@ -834,10 +834,10 @@ async def cron_watchdog() -> None:
 
     # 1. Node-Health pruefen
     for name, node in state.nodes.items():
-        if node.status == NodeStatus.OFFLINE and name != "zenbook":  # Zenbook IP noch unbekannt
+        if node.status == NodeStatus.OFFLINE and name != "npu-node":  # npu-node IP noch unbekannt
             issues.append(f"Node '{name}' ist OFFLINE")
             # Versuche Neustart wenn lokal
-            if name == "jetson":
+            if name == "inference-node":
                 await try_restart_ollama()
 
     # 2. Cronjob-Ausfuehrung pruefen
@@ -875,7 +875,7 @@ async def cron_watchdog() -> None:
                 await state.http.post(
                     f"{node.url}/health-report",
                     json={
-                        "controller": "jetson",
+                        "controller": "inference-node",
                         "issues": issues,
                         "nodes_online": sum(
                             1 for n in state.nodes.values()
@@ -929,7 +929,7 @@ scheduler = AsyncIOScheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup und Shutdown des Daemons."""
-    log.info("=== Way2AGI Jetson Controller startet ===")
+    log.info("=== Way2AGI Inference Node Controller startet ===")
     await state.init()
 
     # Initialer Heartbeat
@@ -954,7 +954,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Way2AGI Jetson Controller",
+    title="Way2AGI Inference Node Controller",
     description="Zentraler Controller fuer das Way2AGI Compute-Netzwerk",
     version="1.0.0",
     lifespan=lifespan,
@@ -1021,7 +1021,7 @@ async def register_node(req: NodeRegisterRequest):
     return {
         "status": "registered",
         "node": req.name,
-        "controller": f"http://YOUR_CONTROLLER_IP:{DAEMON_PORT}",
+        "controller": f"http://YOUR_INFERENCE_NODE_IP:{DAEMON_PORT}",
     }
 
 
@@ -1350,9 +1350,9 @@ async def compose_task(req: ComposeRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    log.info("Starte Way2AGI Jetson Controller Daemon auf Port %d", DAEMON_PORT)
+    log.info("Starte Way2AGI Inference Node Controller Daemon auf Port %d", DAEMON_PORT)
     uvicorn.run(
-        "jetson_daemon:app",
+        "inference_daemon:app",
         host="0.0.0.0",
         port=DAEMON_PORT,
         log_level="info",

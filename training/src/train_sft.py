@@ -1,6 +1,6 @@
 """
 Phase 3: SFT Training — Trainiert abliteriertes Modell mit distillierten Traces.
-Nutzt LoRA fuer VRAM-Effizienz auf YOUR_GPU (32GB).
+Nutzt LoRA fuer VRAM-Effizienz auf RTX 5090 (32GB).
 """
 import logging
 import sys

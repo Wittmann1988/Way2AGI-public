@@ -2,11 +2,11 @@
 """
 Way2AGI Resource Monitor — Trackt Auslastung aller Ressourcen
 ==============================================================
-Laeuft alle 10 Minuten per Cron auf Jetson.
+Laeuft alle 10 Minuten per Cron auf Inference Node.
 Speichert Stats in SQLite. Abrufbar per CLI oder API.
 
 Ressourcen:
-- Lokal: Jetson, Desktop, Laptop, S24 (Ollama + llama.cpp)
+- Lokal: Inference Node, Desktop, Laptop, S24 (Ollama + llama.cpp)
 - Cloud: OpenAI, xAI/Grok, Gemini, Groq
 
 Ziel: Gleichmaessige Verteilung ueber alle Ressourcen.
@@ -19,14 +19,14 @@ import time
 import urllib.request
 from datetime import datetime
 
-DB_PATH = os.environ.get("WAY2AGI_DB", "/data/way2agi/memory/memory.db")
+DB_PATH = os.environ.get("WAY2AGI_DB", "/opt/way2agi/memory/memory.db")
 
 # Alle Ressourcen
 NODES = {
-    "jetson": {"ip": "192.168.50.21", "ollama": 11434, "llama_cpp": 8080, "micro_orch": 8051},
-    "desktop": {"ip": "192.168.50.129", "ollama": 11434, "llama_cpp": 8080},
-    "laptop": {"ip": "192.168.50.111", "ollama": 11434},
-    "s24": {"ip": "192.168.50.182", "ollama": 11434},
+    "inference-node": {"ip": "YOUR_INFERENCE_NODE_IP", "ollama": 11434, "llama_cpp": 8080, "micro_orch": 8051},
+    "desktop": {"ip": "YOUR_COMPUTE_NODE_IP", "ollama": 11434, "llama_cpp": 8080},
+    "laptop": {"ip": "YOUR_NPU_NODE_IP", "ollama": 11434},
+    "s24": {"ip": "YOUR_MOBILE_NODE_IP", "ollama": 11434},
 }
 
 CLOUD_APIS = {
