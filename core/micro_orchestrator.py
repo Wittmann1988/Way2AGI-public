@@ -1,649 +1,121 @@
 # core/micro_orchestrator.py
 """
-Micro-Orchestrator — Lokaler Entscheider pro Geraet
+MicroOrchestrator — Leichtgewichtige Task-Verteilung.
 =====================================================
-Jedes Geraet (Inference Node, Desktop, Laptop, S24) bekommt einen eigenen
-Mini-Orchestrator der lokal entscheidet:
-  - Welches Modell fuer den Task am besten ist
-  - Ob der Task lokal ausfuehrbar ist
-  - Eigene Health-Checks + Model Registry
 
-Der zentrale Orchestrator fragt die Geraete nur noch:
-  "Kannst du diesen Task? Wie schnell? Welches Modell?"
+Wrapper um den vollen Orchestrator fuer einfache Aufrufe.
+Nutzt smart_router + composer intern, bietet einfache API.
 
-Inspiriert von the operator's Vision: Dezentrale Edge-Orchestrierung.
+Usage:
+    from core.micro_orchestrator import MicroOrchestrator
+    orch = MicroOrchestrator()
+    result = orch.route_and_execute("Analysiere diesen Code")
 """
 
-import asyncio
+from __future__ import annotations
+
 import json
 import logging
 import os
-import platform
-import time
+import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-log = logging.getLogger("way2agi.micro_orch")
+log = logging.getLogger("way2agi.micro_orchestrator")
+
+ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:8150")
+
+# Fallback Ollama endpoints (direkt, wenn Orchestrator nicht laeuft)
+OLLAMA_ENDPOINTS = [
+    ("http://192.168.50.21:11434", "huihui_ai/qwen3-abliterated:8b"),
+    ("http://192.168.50.129:11434", "qwen3.5:9b"),
+    ("http://localhost:11434", "huihui_ai/qwen3-abliterated:8b"),
+]
 
 
-# ---------------------------------------------------------------------------
-# Local Model Registry
-# ---------------------------------------------------------------------------
-@dataclass
-class LocalModel:
-    """A model available on this device."""
-    name: str
-    size_gb: float = 0.0
-    speed_tok_s: float = 0.0      # Measured tokens/sec
-    capabilities: List[str] = field(default_factory=list)  # code, reasoning, creative, system, memory
-    max_context: int = 4096
-    is_trained: bool = False       # Way2AGI fine-tuned?
-    backend: str = "ollama"        # ollama | llama_cpp | cloud
-
-
-@dataclass
-class TaskBid:
-    """A bid from this device to handle a task."""
-    can_handle: bool
-    model: str
-    estimated_speed: float       # tok/s
-    estimated_latency_ms: int    # Time to first token
-    confidence: float            # 0-1 how well this model fits
-    backend: str = "ollama"
-    reason: str = ""
-
-
-# ---------------------------------------------------------------------------
-# Task Categories + Keywords (same as central, but local)
-# ---------------------------------------------------------------------------
-TASK_KEYWORDS = {
-    "code": ["code", "programm", "script", "funktion", "bug", "fix", "python",
-             "implement", "refactor", "debug", "api", "typescript"],
-    "reasoning": ["warum", "erklaer", "analysier", "vergleich", "bewert", "denk",
-                  "reason", "think", "math", "logik", "plan"],
-    "creative": ["schreib", "text", "story", "gedicht", "zusammenfass",
-                 "write", "creative", "prompt"],
-    "memory": ["erinner", "speicher", "memory", "wann", "letzte", "frueher"],
-    "system": ["status", "node", "health", "restart", "deploy", "update",
-               "training", "train", "pipeline", "cron", "job", "config",
-               "modell", "model", "liste", "verfuegbar", "starte", "stoppe"],
-}
-
-
-def classify_task(task: str) -> str:
-    """Classify a task into a category."""
-    task_lower = task.lower()
-    scores = {cat: sum(1 for kw in kws if kw in task_lower)
-              for cat, kws in TASK_KEYWORDS.items()}
-    if not any(scores.values()):
-        return "reasoning"
-    return max(scores, key=scores.get)
-
-
-# ---------------------------------------------------------------------------
-# Micro Orchestrator
-# ---------------------------------------------------------------------------
 class MicroOrchestrator:
     """
-    Local orchestrator running on each device.
+    Leichtgewichtiger Orchestrator fuer direkte Nutzung.
 
-    Responsibilities:
-    1. Discover local models (Ollama, llama.cpp)
-    2. Accept task requests and bid on them
-    3. Execute tasks using the best local model
-    4. Report capabilities to central orchestrator
-    5. Health monitoring
+    Versucht:
+    1. Orchestrator-Server (falls laeuft)
+    2. Direkten Ollama-Aufruf als Fallback
     """
 
-    def __init__(
-        self,
-        device_name: str = "",
-        ollama_url: str = "http://localhost:11434",
-        llama_cpp_url: str = "",
-        port: int = 8050,
-    ):
-        self.device_name = device_name or platform.node()
-        self.ollama_url = ollama_url
-        self.llama_cpp_url = llama_cpp_url
-        self.port = port
-        self.models: Dict[str, LocalModel] = {}
-        self.last_discovery = 0.0
-        self._started_at = time.time()
-        # VRAM-Budget: Auto-Detect oder Fallback
-        self._total_vram_gb = self._detect_vram_gb()
+    def __init__(self, orchestrator_url: str = ORCHESTRATOR_URL) -> None:
+        self.orchestrator_url = orchestrator_url
 
-    def _detect_vram_gb(self) -> float:
-        """Erkennt verfuegbares VRAM (GPU) oder RAM (CPU-only)."""
-        # Inference Node: Shared Memory = gesamter RAM
-        try:
-            with open("/proc/meminfo") as f:
-                for line in f:
-                    if line.startswith("MemTotal"):
-                        kb = int(line.split()[1])
-                        total = round(kb / 1024 / 1024, 1)
-                        # Inference Node 64GB: ~58GB nutzbar, Desktop RTX5090: 32GB VRAM
-                        log.info("VRAM/RAM erkannt: %.1fGB (%s)", total, self.device_name)
-                        return total
-        except Exception:
-            pass
-        # Fallback
-        return 32.0
+    def route_and_execute(self, prompt: str, system: str = "", timeout: int = 60) -> str:
+        """Route Task zum besten verfuegbaren Modell und fuehre aus."""
+        # Versuch 1: Orchestrator-Server
+        result = self._try_orchestrator(prompt, system, timeout)
+        if result:
+            return result
 
-    # --- Model Discovery ---
+        # Versuch 2: Direkter Ollama-Aufruf
+        return self._try_ollama_direct(prompt, system, timeout)
 
-    async def discover_models(self) -> Dict[str, LocalModel]:
-        """Discover all available models on this device."""
-        self.models = {}
+    def decompose_task(self, task: str, timeout: int = 60) -> List[Dict[str, Any]]:
+        """Zerlege Task in Sub-Tasks via LLM."""
+        prompt = (
+            f"Zerlege diesen Task in 2-5 ausfuehrbare Schritte:\n\n{task}\n\n"
+            "Format (JSON-Array):\n"
+            '[{"id": "step1", "task": "...", "agent": "reasoner"}, '
+            '{"id": "step2", "task": "...", "agent": "researcher"}]'
+        )
+        response = self.route_and_execute(prompt, timeout=timeout)
 
-        # Discover Ollama models
-        try:
-            req = urllib.request.Request(
-                self.ollama_url + "/api/tags", method="GET"
-            )
-            resp = urllib.request.urlopen(req, timeout=5)
-            data = json.loads(resp.read())
-            for m in data.get("models", []):
-                name = m.get("name", "")
-                size_gb = round(m.get("size", 0) / 1e9, 1)
-                is_trained = "way2agi" in name
-                # Infer capabilities from model name
-                caps = self._infer_capabilities(name, size_gb)
-                self.models[name] = LocalModel(
-                    name=name,
-                    size_gb=size_gb,
-                    capabilities=caps,
-                    is_trained=is_trained,
-                    backend="ollama",
-                )
-            log.info("Ollama: %d Modelle entdeckt", len(self.models))
-        except Exception as e:
-            log.warning("Ollama Discovery fehlgeschlagen: %s", e)
-
-        # Discover llama.cpp
-        if self.llama_cpp_url:
+        # Parse JSON
+        start = response.find("[")
+        end = response.rfind("]")
+        if start != -1 and end != -1:
             try:
-                req = urllib.request.Request(
-                    self.llama_cpp_url + "/health", method="GET"
-                )
-                resp = urllib.request.urlopen(req, timeout=5)
-                data = json.loads(resp.read())
-                if data.get("status") == "ok":
-                    self.models["llama-cpp-speculative"] = LocalModel(
-                        name="nemotron-30b+4b-specdec",
-                        size_gb=27.0,
-                        speed_tok_s=31.0,
-                        capabilities=["code", "reasoning", "creative", "system"],
-                        backend="llama_cpp",
-                    )
-                    log.info("llama.cpp SpecDec: aktiv")
-            except Exception:
+                return json.loads(response[start:end + 1])
+            except json.JSONDecodeError:
                 pass
 
-        self.last_discovery = time.time()
-        return self.models
+        return [{"id": "step1", "task": task, "agent": "reasoner"}]
 
-    def _infer_capabilities(self, name: str, size_gb: float) -> List[str]:
-        """Infer model capabilities from name and size."""
-        caps = []
-        name_lower = name.lower()
+    def _try_orchestrator(self, prompt: str, system: str, timeout: int) -> Optional[str]:
+        """Versuche den Orchestrator-Server."""
+        try:
+            payload = json.dumps({
+                "prompt": prompt,
+                "system": system,
+            }).encode()
+            req = urllib.request.Request(
+                f"{self.orchestrator_url}/api/chat",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read())
+                return data.get("response", "")
+        except Exception as e:
+            log.debug("Orchestrator unavailable: %s", e)
+            return None
 
-        # Size-based: small models = system/simple, large = reasoning/code
-        if size_gb < 2:
-            caps.extend(["system", "memory"])
-        elif size_gb < 6:
-            caps.extend(["system", "reasoning", "memory"])
-        else:
-            caps.extend(["code", "reasoning", "creative", "system", "memory"])
-
-        # Name-based specialization
-        if "memory" in name_lower:
-            caps = ["memory", "system"]
-        elif "consciousness" in name_lower:
-            caps = ["reasoning", "creative", "memory"]
-        elif "orchestrator" in name_lower:
-            caps = ["system", "reasoning"]
-        elif "coder" in name_lower or "code" in name_lower:
-            caps = ["code", "reasoning"]
-        elif "smallthinker" in name_lower:
-            caps = ["reasoning", "system"]
-
-        return list(set(caps))
-
-    # --- Bidding ---
-
-    def bid_on_task(self, task: str, task_type: str = "") -> TaskBid:
-        """
-        Evaluate if this device can handle the task and return a bid.
-        The central orchestrator collects bids from all devices and picks the best.
-        """
-        if not task_type:
-            task_type = classify_task(task)
-
-        best_model = None
-        best_score = -1.0
-
-        for name, model in self.models.items():
-            if task_type not in model.capabilities:
+    def _try_ollama_direct(self, prompt: str, system: str, timeout: int) -> str:
+        """Direkter Ollama-Aufruf als Fallback."""
+        for endpoint, model in OLLAMA_ENDPOINTS:
+            try:
+                payload = json.dumps({
+                    "model": model,
+                    "prompt": prompt,
+                    "system": system,
+                    "stream": False,
+                    "options": {"temperature": 0.5, "num_predict": 512},
+                }).encode()
+                req = urllib.request.Request(
+                    f"{endpoint}/api/generate",
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = json.loads(resp.read())
+                    return data.get("response", "")
+            except Exception as e:
+                log.debug("Ollama %s failed: %s", endpoint, e)
                 continue
 
-            # Score: smaller = better for simple tasks, bigger = better for complex
-            score = 0.0
-            if task_type == "system":
-                # Prefer smallest model
-                score = 1.0 / max(model.size_gb, 0.1)
-            elif task_type == "code":
-                # Prefer larger models
-                score = model.size_gb * 0.5
-                if model.is_trained:
-                    score *= 1.5
-            elif task_type == "reasoning":
-                score = model.size_gb * 0.3
-                if "think" in name.lower():
-                    score *= 2.0
-            elif task_type == "memory":
-                if model.is_trained and "memory" in name.lower():
-                    score = 10.0  # Strongly prefer trained memory agent
-                else:
-                    score = 0.5
-            else:
-                score = model.size_gb * 0.2
-
-            # Bonus for SpecDec
-            if model.backend == "llama_cpp":
-                score *= 1.3
-
-            if score > best_score:
-                best_score = score
-                best_model = model
-
-        if not best_model:
-            return TaskBid(
-                can_handle=False, model="", estimated_speed=0,
-                estimated_latency_ms=0, confidence=0, reason="Kein passendes Modell"
-            )
-
-        # Estimate speed based on model size
-        est_speed = best_model.speed_tok_s if best_model.speed_tok_s > 0 else (
-            50.0 if best_model.size_gb < 2 else
-            30.0 if best_model.size_gb < 6 else
-            15.0
-        )
-
-        return TaskBid(
-            can_handle=True,
-            model=best_model.name,
-            estimated_speed=est_speed,
-            estimated_latency_ms=int(100 + best_model.size_gb * 50),
-            confidence=min(best_score / 10.0, 1.0),
-            backend=best_model.backend,
-            reason=f"{task_type} -> {best_model.name} ({best_model.size_gb}GB)",
-        )
-
-    # --- Execution ---
-
-    async def execute_task(self, task: str, model: str = "", system: str = "") -> Dict[str, Any]:
-        """Execute a task using the best local model."""
-        if not model:
-            bid = self.bid_on_task(task)
-            if not bid.can_handle:
-                return {"error": "Kein passendes Modell", "success": False}
-            model = bid.model
-            backend = bid.backend
-        else:
-            m = self.models.get(model)
-            backend = m.backend if m else "ollama"
-
-        # Default system prompt if none provided
-        if not system:
-            system = (
-                f"Du bist ein KI-Agent auf dem Geraet '{self.device_name}' im Way2AGI System. "
-                f"Antworte auf Deutsch, kurz und konkret. Keine Meta-Kommentare. "
-                f"Du hast Zugriff auf {len(self.models)} lokale Modelle."
-            )
-
-        t0 = time.time()
-
-        # Ensure model is loaded before calling
-        await self.ensure_model_ready(model)
-
-        if backend == "llama_cpp" and self.llama_cpp_url:
-            result = await self._call_llama_cpp(task, system)
-        else:
-            result = await self._call_ollama(task, model, system)
-
-        duration = round(time.time() - t0, 2)
-        result["device"] = self.device_name
-        result["model"] = model
-        result["duration_s"] = duration
-        return result
-
-    async def _call_ollama(self, prompt: str, model: str, system: str = "") -> Dict[str, Any]:
-        """Call Ollama Chat API with smart Thinking-model handling."""
-        model_lower = model.lower()
-        # Only Qwen3 models reliably support think:false
-        supports_think_false = "qwen3" in model_lower
-        is_thinking_model = any(k in model_lower for k in
-                                ["qwen3", "abliterated", "think", "smallthinker"])
-
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system[:500]})
-        messages.append({"role": "user", "content": prompt[:1000]})
-
-        # Thinking models that DON'T support think:false need more tokens
-        num_predict = 400
-        if is_thinking_model and not supports_think_false:
-            num_predict = 1200  # Extra budget for thinking + response
-
-        body: Dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "options": {"num_predict": num_predict, "repeat_penalty": 1.3},
-        }
-        if supports_think_false:
-            body["think"] = False
-
-        payload = json.dumps(body).encode()
-
-        try:
-            req = urllib.request.Request(
-                self.ollama_url + "/api/chat",
-                data=payload, method="POST",
-                headers={"Content-Type": "application/json"},
-            )
-            resp = urllib.request.urlopen(req, timeout=180)
-            data = json.loads(resp.read())
-            msg = data.get("message", {})
-            response = msg.get("content", "")
-            # Fallback: if content empty but thinking exists, use thinking summary
-            if not response and msg.get("thinking"):
-                response = "[Thinking] " + msg["thinking"][:400]
-            return {
-                "response": response,
-                "success": True,
-                "eval_count": data.get("eval_count", 0),
-                "eval_duration": data.get("eval_duration", 0),
-            }
-        except Exception as e:
-            return {"error": str(e), "success": False}
-
-    async def _call_llama_cpp(self, prompt: str, system: str = "") -> Dict[str, Any]:
-        """Call llama.cpp API."""
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system[:300]})
-        messages.append({"role": "user", "content": prompt[:1000]})
-
-        payload = json.dumps({
-            "messages": messages,
-            "max_tokens": 300,
-            "stream": False,
-        }).encode()
-
-        try:
-            req = urllib.request.Request(
-                self.llama_cpp_url + "/v1/chat/completions",
-                data=payload, method="POST",
-                headers={"Content-Type": "application/json"},
-            )
-            resp = urllib.request.urlopen(req, timeout=120)
-            data = json.loads(resp.read())
-            text = data["choices"][0]["message"]["content"]
-            usage = data.get("usage", {})
-            return {
-                "response": text,
-                "success": True,
-                "eval_count": usage.get("completion_tokens", 0),
-            }
-        except Exception as e:
-            return {"error": str(e), "success": False}
-
-    # --- Model Lifecycle Management (T035) ---
-
-    async def load_model(self, model_name: str) -> Dict[str, Any]:
-        """Start/load a model via Ollama. Orchestrator decides WHICH models run."""
-        try:
-            # Ollama loads a model by sending a generate with num_predict=0
-            payload = json.dumps({
-                "model": model_name,
-                "prompt": "",
-                "options": {"num_predict": 0},
-            }).encode()
-            req = urllib.request.Request(
-                self.ollama_url + "/api/generate",
-                data=payload, method="POST",
-                headers={"Content-Type": "application/json"},
-            )
-            urllib.request.urlopen(req, timeout=60)
-            log.info("Modell geladen: %s", model_name)
-            # Re-discover to update model list
-            await self.discover_models()
-            return {"loaded": model_name, "success": True}
-        except Exception as e:
-            log.warning("Modell laden fehlgeschlagen: %s — %s", model_name, e)
-            return {"loaded": model_name, "success": False, "error": str(e)}
-
-    async def unload_model(self, model_name: str) -> Dict[str, Any]:
-        """Unload a model to free VRAM. Uses Ollama keep_alive=0."""
-        try:
-            payload = json.dumps({
-                "model": model_name,
-                "keep_alive": 0,
-            }).encode()
-            req = urllib.request.Request(
-                self.ollama_url + "/api/generate",
-                data=payload, method="POST",
-                headers={"Content-Type": "application/json"},
-            )
-            urllib.request.urlopen(req, timeout=10)
-            log.info("Modell entladen: %s", model_name)
-            return {"unloaded": model_name, "success": True}
-        except Exception as e:
-            return {"unloaded": model_name, "success": False, "error": str(e)}
-
-    async def ensure_model_ready(self, model_name: str) -> bool:
-        """Ensure a model is loaded and ready. Manages VRAM automatically."""
-        running_models = self._get_running_models_detail()
-        running_names = [m["name"] for m in running_models]
-
-        if model_name in running_names:
-            return True
-
-        # VRAM-Check: Genug Platz fuer das neue Modell?
-        model_info = self.models.get(model_name)
-        needed_gb = model_info.size_gb if model_info else 4.0
-        used_gb = sum(m.get("size_gb", 0) for m in running_models)
-        free_gb = self._total_vram_gb - used_gb
-
-        if needed_gb > free_gb:
-            # VRAM voll — entlade LRU-Modelle (nicht-trainierte zuerst)
-            log.info("VRAM knapp: brauche %.1fGB, frei %.1fGB — entlade Modelle",
-                     needed_gb, free_gb)
-            freed = await self._free_vram(needed_gb - free_gb, running_models, model_name)
-            if not freed:
-                log.warning("Konnte nicht genug VRAM freigeben fuer %s", model_name)
-
-        result = await self.load_model(model_name)
-        return result.get("success", False)
-
-    def _get_running_models_detail(self) -> List[Dict[str, Any]]:
-        """Holt laufende Modelle mit VRAM-Verbrauch von Ollama."""
-        try:
-            req = urllib.request.Request(self.ollama_url + "/api/ps", method="GET")
-            resp = urllib.request.urlopen(req, timeout=5)
-            data = json.loads(resp.read())
-            result = []
-            for m in data.get("models", []):
-                name = m.get("name", "")
-                size_bytes = m.get("size", 0)
-                size_gb = round(size_bytes / 1e9, 1) if size_bytes else 0
-                # Fallback: Groesse aus unserer Registry
-                if not size_gb and name in self.models:
-                    size_gb = self.models[name].size_gb
-                result.append({
-                    "name": name,
-                    "size_gb": size_gb,
-                    "is_trained": "way2agi" in name.lower(),
-                    "expires_at": m.get("expires_at", ""),
-                })
-            return result
-        except Exception:
-            return []
-
-    async def _free_vram(self, needed_gb: float, running: List[Dict],
-                         keep_model: str = "") -> bool:
-        """Entlaedt Modelle bis genug VRAM frei ist. Priorisierung:
-        1. Nicht-trainierte kleine Modelle zuerst entladen
-        2. Nicht-trainierte grosse Modelle
-        3. Trainierte Modelle nur im Notfall
-        Nie das aktuell benoetigte Modell entladen."""
-        # Sortierung: trainierte Modelle am Ende (schuetzen), grosse zuerst (mehr VRAM frei)
-        candidates = sorted(
-            [m for m in running if m["name"] != keep_model],
-            key=lambda m: (m["is_trained"], -m["size_gb"]),
-        )
-
-        freed = 0.0
-        for model in candidates:
-            if freed >= needed_gb:
-                break
-            log.info("Entlade %s (%.1fGB) um Platz zu schaffen", model["name"], model["size_gb"])
-            result = await self.unload_model(model["name"])
-            if result.get("success"):
-                freed += model["size_gb"]
-                # Kurz warten damit Ollama VRAM freigibt
-                await asyncio.sleep(1)
-
-        log.info("VRAM freigemacht: %.1fGB (benoetigt: %.1fGB)", freed, needed_gb)
-        return freed >= needed_gb
-
-    def get_available_models(self) -> List[str]:
-        """Get all models installed (not just running) on this device."""
-        return list(self.models.keys())
-
-    def get_running_models(self) -> List[str]:
-        """Get currently loaded/running models."""
-        try:
-            req = urllib.request.Request(
-                self.ollama_url + "/api/ps", method="GET"
-            )
-            resp = urllib.request.urlopen(req, timeout=5)
-            data = json.loads(resp.read())
-            return [m.get("name", "") for m in data.get("models", [])]
-        except Exception:
-            return []
-
-    # --- Capabilities Report ---
-
-    def get_capabilities(self) -> Dict[str, Any]:
-        """Report this device's capabilities to the central orchestrator."""
-        model_list = []
-        for name, m in self.models.items():
-            model_list.append({
-                "name": m.name,
-                "size_gb": m.size_gb,
-                "capabilities": m.capabilities,
-                "backend": m.backend,
-                "is_trained": m.is_trained,
-            })
-
-        return {
-            "device": self.device_name,
-            "port": self.port,
-            "models": model_list,
-            "model_count": len(self.models),
-            "uptime_s": round(time.time() - self._started_at, 1),
-            "last_discovery": self.last_discovery,
-            "timestamp": datetime.now().isoformat(),
-        }
-
-    def get_vram_status(self) -> Dict[str, Any]:
-        """VRAM-Auslastung in Prozent."""
-        running = self._get_running_models_detail()
-        used_gb = sum(m["size_gb"] for m in running)
-        total = self._total_vram_gb
-        pct = round(used_gb / total * 100, 1) if total > 0 else 0
-        return {
-            "device": self.device_name,
-            "total_gb": total,
-            "used_gb": round(used_gb, 1),
-            "free_gb": round(total - used_gb, 1),
-            "utilization_pct": pct,
-            "models_loaded": [{"name": m["name"], "size_gb": m["size_gb"]} for m in running],
-        }
-
-    def get_health(self) -> Dict[str, Any]:
-        """Quick health check."""
-        vram = self.get_vram_status()
-        return {
-            "status": "ok" if self.models else "no_models",
-            "device": self.device_name,
-            "models": len(self.models),
-            "vram_pct": vram["utilization_pct"],
-            "uptime_s": round(time.time() - self._started_at, 1),
-        }
-
-
-# ---------------------------------------------------------------------------
-# FastAPI App (laeuft auf jedem Geraet)
-# ---------------------------------------------------------------------------
-def create_app(orch: MicroOrchestrator):
-    """Create FastAPI app for the micro-orchestrator."""
-    from fastapi import FastAPI
-    from pydantic import BaseModel
-
-    app = FastAPI(title=f"Way2AGI Micro-Orchestrator ({orch.device_name})")
-
-    class TaskRequest(BaseModel):
-        task: str
-        model: str = ""
-        system: str = ""
-
-    class BidRequest(BaseModel):
-        task: str
-        task_type: str = ""
-
-    @app.on_event("startup")
-    async def startup():
-        await orch.discover_models()
-
-    @app.get("/health")
-    async def health():
-        return orch.get_health()
-
-    @app.get("/capabilities")
-    async def capabilities():
-        return orch.get_capabilities()
-
-    @app.post("/bid")
-    async def bid(req: BidRequest):
-        bid = orch.bid_on_task(req.task, req.task_type)
-        return {
-            "device": orch.device_name,
-            "can_handle": bid.can_handle,
-            "model": bid.model,
-            "speed": bid.estimated_speed,
-            "latency_ms": bid.estimated_latency_ms,
-            "confidence": bid.confidence,
-            "backend": bid.backend,
-            "reason": bid.reason,
-        }
-
-    @app.post("/execute")
-    async def execute(req: TaskRequest):
-        result = await orch.execute_task(req.task, req.model, req.system)
-        return result
-
-    @app.post("/discover")
-    async def discover():
-        models = await orch.discover_models()
-        return {"models": len(models), "device": orch.device_name}
-
-    @app.get("/vram")
-    async def vram():
-        return orch.get_vram_status()
-
-    return app
+        return "[FEHLER: Kein LLM-Endpoint erreichbar]"

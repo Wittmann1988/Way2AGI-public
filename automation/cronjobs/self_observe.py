@@ -143,6 +143,36 @@ def main():
     conn.commit()
     conn.close()
     log.info('Reflexion: %s', reflection[:200])
+
+    # Titans Memory: Encode surprising observations + periodic replay
+    try:
+        sys.path.insert(0, CORE_BASE if 'CORE_BASE' in dir() else '/data/way2agi')
+        from memory.titans_replay import TitansMemory
+        tm = TitansMemory(db_path=DB_PATH)
+        surprise = min(1.0, total_errors * 0.15 + 0.2)
+        tm.encode(
+            'Self-Observation: %d Fehler. %s' % (total_errors, reflection[:300]),
+            surprise=surprise,
+            metadata={'source': 'self_observe', 'total_errors': total_errors},
+        )
+        import random
+        if random.random() < 0.17:
+            replay = tm.sleep_replay()
+            log.info('Titans Replay: cons=%d forg=%d str=%d', replay.consolidated, replay.forgotten, replay.strengthened)
+    except Exception as e:
+        log.debug('Titans nicht verfuegbar (non-critical): %s', e)
+
+    # 3-Layer Consciousness: Observe and learn
+    try:
+        from agents.consciousness.consciousness_layer import ThreeLayerConsciousness
+        c = ThreeLayerConsciousness(db_path=DB_PATH)
+        c.observe_and_learn(
+            'self_observe_scan',
+            'Errors: %d, Reflection: %s' % (total_errors, reflection[:100]),
+        )
+    except Exception as e:
+        log.debug('Consciousness nicht verfuegbar (non-critical): %s', e)
+
     log.info('=== Self-Observe beendet ===')
 
 

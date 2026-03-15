@@ -93,6 +93,21 @@ def main():
     except Exception as e:
         log.error('Unerwarteter Fehler: %s', e)
 
+    # GEA Group-Evolving Agents (neu: Paper 2602.04837)
+    log.info('Starte GEA Group-Evolving cycle...')
+    try:
+        sys.path.insert(0, CORE_BASE)
+        from core.evolution.group_evolve import GroupEvolvingEngine
+        import asyncio
+        engine = GroupEvolvingEngine(db_path=DB_PATH)
+        gea_result = asyncio.run(engine.evolve_cycle(
+            "Automatische Evolution: Analysiere aktuelle Systemleistung und schlage Verbesserungen vor",
+            agent_id="evolution_cron",
+        ))
+        log.info('GEA Ergebnis: score=%.2f lessons=%s', gea_result["score"], gea_result["lessons"])
+    except Exception as e:
+        log.warning('GEA nicht verfuegbar (non-critical): %s', e)
+
     log.info('=== Evolution-Wrapper beendet ===')
 
 
