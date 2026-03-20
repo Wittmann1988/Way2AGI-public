@@ -6,9 +6,9 @@ from cli.config import Way2AGIConfig
 
 def test_default_config_has_free_providers():
     cfg = Way2AGIConfig._defaults()
-    assert cfg["provider"] == "openrouter"
-    assert cfg["model"] == "qwen/qwen3-coder"
-    assert cfg["providers"]["openrouter"]["api_key"] == ""
+    assert cfg["provider"] == "anthropic"
+    assert cfg["model"] == "claude-sonnet-4-6"
+    assert "anthropic" in cfg["providers"]
 
 
 def test_save_and_load(tmp_path):
@@ -54,6 +54,6 @@ def test_deep_merge_preserves_defaults(tmp_path):
 
 def test_provider_config():
     cfg = Way2AGIConfig(config_path=Path("/tmp/nonexistent_way2agi.json"))
-    assert cfg.provider == "openrouter"
+    assert cfg.provider == "anthropic"
     assert "base_url" in cfg.provider_config
     assert "models" in cfg.provider_config

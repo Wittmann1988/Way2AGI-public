@@ -276,9 +276,9 @@ def test_list_providers(registry):
 # --- build_default_registry ---
 
 
-def test_default_registry_has_7_models():
+def test_default_registry_has_15_models():
     reg = build_default_registry()
-    assert reg.model_count == 7
+    assert reg.model_count == 15
 
 
 def test_default_registry_model_ids():
@@ -331,5 +331,5 @@ def test_default_registry_find_fastest_reasoning():
     reg = build_default_registry()
     fastest = reg.find_fastest("reasoning")
     assert fastest is not None
-    # Haiku and Kimi-K2 are "fast"; Kimi has 0.82, Haiku 0.75
-    assert fastest.id == "kimi-k2-groq"
+    # deepseek-r1-desktop is now the fastest reasoning model
+    assert fastest.id == "deepseek-r1-desktop"
